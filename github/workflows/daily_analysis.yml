@@ -1,0 +1,50 @@
+name: Análisis diario de calidad · 4am
+
+on:
+  schedule:
+    # 4am hora Argentina (UTC-3) = 7am UTC
+    - cron: '0 7 * * *'
+  # Permite correr manualmente desde GitHub
+  workflow_dispatch:
+    inputs:
+      force_full:
+        description: 'Forzar análisis completo (no solo nuevos comentarios)'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  analizar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Instalar dependencias
+        run: |
+          pip install \
+            requests \
+            google-auth \
+            google-auth-httplib2 \
+            google-api-python-client
+
+      - name: Correr análisis
+        env:
+          ANTHROPIC_API_KEY:      ${{ secrets.ANTHROPIC_API_KEY }}
+          GOOGLE_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
+          RESULTS_SHEET_ID:       ${{ secrets.RESULTS_SHEET_ID }}
+        run: |
+          python scripts/analyze.py
+
+      - name: Notificar resultado
+        if: failure()
+        run: |
+          echo "::error::El análisis diario falló. Revisá los logs."
