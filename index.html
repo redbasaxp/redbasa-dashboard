@@ -406,6 +406,9 @@ async function loadData() {
         estrellas_prev: parseFloat(get('estrellas_prev')) || null,
         dist_nps:     tryJSON(get('dist_nps'), {}),
         sparkline:    tryJSON(get('sparkline'), []),
+        google_rating:    parseFloat(get('google_rating'))   || null,
+        google_reviews:   parseInt(get('google_reviews'))    || null,
+        google_sparkline: tryJSON(get('google_sparkline'), []),
         resumen_ia:   get('resumen_ia'),
         problemas_ia: tryJSON(get('problemas_ia'), []),
         tags_ia:      get('tags_ia'),
@@ -757,6 +760,56 @@ function renderCard(centro) {
     }
   }
 
+  // Google Rating
+  const gRow = getRow(centro,'month','TODAS');
+  let googleSection = '';
+  if (gRow?.google_rating) {
+    const gr    = parseFloat(gRow.google_rating);
+    const grev  = gRow.google_reviews ? `· ${Number(gRow.google_reviews).toLocaleString('es-AR')} reseñas` : '';
+    const gFull = Math.round(gr);
+    const gGlyph= '★'.repeat(Math.max(0,gFull))+'☆'.repeat(Math.max(0,5-gFull));
+    const gCls  = gr>=4?'good':gr>=3?'warn':'bad';
+    const gColor= gCls==='good'?'#0d8a80':gCls==='warn'?'#b07a00':'var(--red)';
+
+    // Google sparkline
+    const gSparkData = gRow.google_sparkline || [];
+    let gSparkSvg = '';
+    if (gSparkData.length >= 2) {
+      const pts  = gSparkData.map(d => d.r ?? d.rating ?? null).filter(v=>v!==null);
+      if (pts.length >= 2) {
+        const minV = Math.min(...pts), maxV = Math.max(...pts);
+        const range = maxV - minV || 0.5;
+        const W=280, H=36, P=4;
+        let pathD='', prevPt=null;
+        gSparkData.forEach((d,i) => {
+          const val = d.r ?? d.rating ?? null;
+          if (val===null) { prevPt=null; return; }
+          const x = P+(i/(gSparkData.length-1))*(W-P*2);
+          const y = H-P-((val-minV)/range)*(H-P*2);
+          pathD += prevPt ? ` L${x.toFixed(1)},${y.toFixed(1)}` : `M${x.toFixed(1)},${y.toFixed(1)}`;
+          prevPt = {x,y};
+        });
+        const first = gSparkData[0]?.m||'', last = gSparkData[gSparkData.length-1]?.m||'';
+        gSparkSvg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:36px" preserveAspectRatio="none">
+          <path d="${pathD}" fill="none" stroke="#fbbc04" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted)"><span>${first}</span><span>${last}</span></div>`;
+      }
+    }
+
+    googleSection = `<div class="sc-ai" style="background:rgba(251,188,4,.04);border-top:1px solid var(--border)">
+      <div class="ai-title">Google Maps · actualización mensual</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:${gSparkSvg?'8':'0'}px">
+        <span style="font-family:'Nunito',sans-serif;font-size:24px;font-weight:800;color:${gColor}">${gr.toFixed(1)}</span>
+        <div>
+          <div style="font-size:16px;color:#fbbc04">${gGlyph}</div>
+          <div style="font-size:11px;color:var(--muted)">${grev}</div>
+        </div>
+      </div>
+      ${gSparkSvg ? `<div class="spark-title" style="margin-top:4px">Evolución rating Google</div>${gSparkSvg}` : ''}
+    </div>`;
+  }
+
   // AI
   const aiRow = getRow(centro,'month','TODAS');
   let aiSection = '';
@@ -785,6 +838,7 @@ function renderCard(centro) {
     ${reportSection}
     ${prepSection}
     ${sparkSection}
+    ${googleSection}
     ${aiSection}
   </div>`;
 }
