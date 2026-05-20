@@ -289,7 +289,7 @@ NEGATIVE_COMMENTS_HEADER = [
     "nombre_paciente", "comentario", "fecha_deteccion", "notificado_dm", "fecha_notificacion"
 ]
 NPS_NEGATIVO_UMBRAL = 4   # NPS ≤ 4
-FECHA_INICIO_ALERTAS = datetime.date(2025, 5, 1)
+FECHA_INICIO_ALERTAS = datetime.date(2026, 5, 1)
 
 def ensure_negative_sheet(token):
     """Create the 'Comentarios Negativos' sheet if it doesn't exist."""
