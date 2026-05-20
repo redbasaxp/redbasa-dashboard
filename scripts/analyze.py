@@ -1,955 +1,693 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sanatorio San José · Experiencia del Paciente</title>
-<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Nunito+Sans:wght@400;600;700&display=swap" rel="stylesheet">
-<style>
-:root {
-  --turquesa: #20d3c2;
-  --azul: #00aef0;
-  --navy: #003D5C;
-  --navy2: #00527a;
-  --fondo: #F0FAFA;
-  --texto: #0D2B38;
-  --muted: #5a8a9f;
-  --card-bg: #ffffff;
-  --border: #d4eaf0;
-  --red: #e05252;
-  --yellow: #f0b429;
-}
-* { box-sizing:border-box; margin:0; padding:0; }
-body { font-family:'Nunito Sans',sans-serif; background:var(--fondo); color:var(--texto); min-height:100vh; }
+#!/usr/bin/env python3
+"""
+Red Basa · Análisis nocturno
+Lee la planilla consolidada UNA vez, pre-calcula todo,
+y escribe una hoja de resultados plana que el tablero lee directamente.
 
-/* LOGIN */
-#login-screen {
-  position:fixed; inset:0; background:var(--navy);
-  display:flex; align-items:center; justify-content:center; z-index:9999;
-}
-.login-box {
-  background:#fff; border-radius:16px; padding:40px 48px;
-  width:360px; text-align:center; box-shadow:0 20px 60px rgba(0,0,0,.3);
-}
-.login-logo { font-family:'Nunito',sans-serif; font-size:24px; font-weight:800; color:var(--turquesa); margin-bottom:4px; letter-spacing:.04em; }
-.login-sub  { font-size:14px; color:var(--navy); font-weight:700; margin-bottom:4px; }
-.login-desc { color:var(--muted); font-size:13px; margin-bottom:28px; }
-.login-box input {
-  width:100%; padding:12px 16px; border:2px solid var(--border);
-  border-radius:10px; font-size:16px; font-family:inherit;
-  outline:none; margin-bottom:16px; transition:border-color .2s;
-}
-.login-box input:focus { border-color:var(--turquesa); }
-.login-box button {
-  width:100%; padding:12px; background:var(--navy); color:#fff;
-  border:none; border-radius:10px; font-family:'Nunito',sans-serif;
-  font-size:16px; font-weight:700; cursor:pointer; transition:background .2s;
-}
-.login-box button:hover { background:var(--navy2); }
-.login-err { color:var(--red); font-size:13px; margin-top:10px; min-height:18px; }
+Estructura de salida (una fila por combinación centro × período × financiador):
+  centro | periodo | financiador | nps | n_nps | csat_rrhh | csat_confort | csat_adic | csat_global
+  | estrellas | n_estrellas | nps_prev | estrellas_prev | csat_prev
+  | dist_nps (JSON) | sparkline (JSON) | resumen_ia | problemas (JSON) | tags
+  | fecha_analisis
+"""
 
-/* TOPBAR */
-#topbar {
-  background:var(--navy); padding:0 24px;
-  display:flex; align-items:center; gap:16px;
-  height:56px; position:sticky; top:0; z-index:100;
-  box-shadow:0 2px 12px rgba(0,0,0,.2);
-}
-.tb-logo { font-family:'Nunito',sans-serif; font-size:18px; font-weight:800; color:#fff; letter-spacing:.04em; line-height:1.1; }
-.tb-logo small { display:block; font-size:11px; font-weight:600; color:rgba(255,255,255,.5); letter-spacing:.04em; }
-.tb-sep { flex:1; }
-.fin-wrap { display:flex; align-items:center; gap:6px; }
-.fin-label { font-size:12px; color:rgba(255,255,255,.5); }
-.tb-select {
-  background:rgba(255,255,255,.12); color:#fff;
-  border:1px solid rgba(255,255,255,.2); border-radius:8px;
-  padding:6px 28px 6px 10px; font-family:'Nunito Sans',sans-serif;
-  font-size:13px; cursor:pointer; outline:none;
-  appearance:none; -webkit-appearance:none;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23fff' opacity='.6'/%3E%3C/svg%3E");
-  background-repeat:no-repeat; background-position:right 10px center;
-}
-.tb-select option { background:var(--navy); color:#fff; }
-.tb-sync { font-size:12px; color:rgba(255,255,255,.45); white-space:nowrap; line-height:1.4; }
+import os, json, csv, io, re, datetime, urllib.request, urllib.parse, time
 
-/* APP */
-#app { display:none; }
-#main { padding:24px; max-width:1400px; margin:0 auto; }
+# ── CONFIG ────────────────────────────────────────────────────────────────
+CONSOLIDATED_SHEET_ID = "1mhUnoBaKmomr2HM3Ojr_-2Anf0deefnS4TWm0P_WLbc"
+RESULTS_SHEET_ID      = os.environ["RESULTS_SHEET_ID"]
+ANTHROPIC_API_KEY     = os.environ["ANTHROPIC_API_KEY"]
+GOOGLE_SA             = json.loads(os.environ["GOOGLE_SERVICE_ACCOUNT"])
+GOOGLE_RATINGS_SHEET  = os.environ.get("GOOGLE_RATINGS_SHEET_ID", "")
 
-/* HERO */
-.centro-hero {
-  background:var(--navy); border-radius:16px;
-  padding:22px 28px; margin-bottom:20px; color:#fff;
-  display:flex; align-items:center; gap:18px;
-  border-left:5px solid var(--turquesa);
-}
-.hero-icon { width:48px; height:48px; border-radius:12px; background:rgba(32,211,194,.15); display:flex; align-items:center; justify-content:center; font-size:24px; flex-shrink:0; }
-.hero-name { font-family:'Nunito',sans-serif; font-size:20px; font-weight:800; line-height:1.2; }
-.hero-sub  { font-size:12px; color:rgba(255,255,255,.5); margin-top:2px; }
-.hero-badges { display:flex; gap:8px; margin-top:7px; flex-wrap:wrap; }
-.badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; font-family:'Nunito',sans-serif; }
-.badge-ep   { background:rgba(32,211,194,.2); color:#5ef5ea; }
-.badge-info { background:rgba(0,174,240,.15); color:#7dd6f5; }
+# Token cache
+_token_cache = {"token": None, "expires": 0}
 
-/* LOADING */
-.loading-card { background:var(--card-bg); border-radius:14px; border:2px solid var(--border); padding:32px; text-align:center; color:var(--muted); font-size:14px; }
-.spinner { display:inline-block; width:24px; height:24px; border:3px solid var(--border); border-top-color:var(--turquesa); border-radius:50%; animation:spin .8s linear infinite; margin-bottom:10px; }
-@keyframes spin { to { transform:rotate(360deg); } }
-
-/* REPORT DESC */
-.report-desc {
-  background:rgba(32,211,194,.08); border-left:3px solid var(--turquesa);
-  border-radius:0 8px 8px 0; padding:10px 16px;
-  font-size:13px; color:var(--muted); margin-bottom:10px; line-height:1.5;
+# ── PLACE IDs GOOGLE MAPS ─────────────────────────────────────────────────
+PLACE_IDS = {
+    "POLICLÍNICO REGIONAL AVELLANEDA":      "ChIJc0KmDq7MvJURkWByxyeoVyw",
+    "SANATORIO AUGUSTO VANDOR":             "ChIJzbPfUUhyu5URZLl0-uH13d0",
+    "CLÍNICA SAGRADO CORAZÓN":              "ChIJm1F2Co6hvJURW2gJxMQMOCI",
+    "SANATORIO SAN MARTÍN":                 "ChIJlbjjdna3vJUR2iDMN2kc30Q",
+    "CLÍNICA SANTA CLARA VARELA":           "ChIJ0TsF13opo5UR9kNjwwAvUjA",
+    "CLÍNICA SANTA CLARA QUILMES":          "ChIJP9HQBQwyo5UR7L7if6QWCqg",
+    "CLÍNICA SANTA CLARA MORÓN":            "ChIJh-IYCwDHvJURurPVSQhVKPY",
+    "CLÍNICA SANTA CLARA TALAR":            "ChIJm8FZRV2jvJURcRCDW058AZo",
+    "CLÍNICA SANTA CLARA ZÁRATE":           "ChIJ61rCoV4Lu5URBuFY7d9Tb0U",
+    "SANATORIO GENERAL SARMIENTO":          "ChIJrcA81Gy9vJURt2zOrHt9vjM",
+    "SANATORIO LOBOS":                      "ChIJNaVyaVIHvZURUx5ARZhxeXw",
+    "CENTRO GALLEGO DE BUENOS AIRES":       "ChIJ4Q2ZVObKvJURfRdBRH9oDds",
+    "POLICLÍNICO CENTRAL UOM":              "ChIJwdnBjPbKvJURMeoB0IsY5Go",
+    "SANATORIO SAN JOSÉ":                   "ChIJuQaCbITKvJURjCUz0wOjBak",
+    "CLÍNICA SANTA ROSA":                   "ChIJ99XsoDEJfpYREkiEXvh2crg",
+    "SOCIEDAD ESPAÑOLA":                    "ChIJIVW75CIJfpYR4Ca-xVpF6nk",
+    "CLÍNICA SANTA CLARA MENDOZA":          "ChIJ34WiSWUJfpYRxxaTK0Lc2eY",
+    "CENTRO MÉDICO SANTA CLARA DORREGO MALL":"ChIJFWK77mIJfpYRLgavaHRKN4I",
+    "SANATORIO JULIÁN MORENO":              "ChIJtwTLdgAttpUR6VRcjlAeOz0",
+    "CLÍNICA SANTA CLARA SAN JUAN":         "ChIJxxxVZCdAgZYRKXU0VzA5M80",
 }
 
-/* GRID — 3 cards una al lado de la otra */
-#grid { display:grid; grid-template-columns:repeat(3,1fr); gap:20px; }
+def match_place_id(centro_name):
+    """Match a centro name from the sheet to a Place ID (fuzzy)."""
+    cu = centro_name.upper().strip()
+    # Direct match
+    if cu in PLACE_IDS:
+        return PLACE_IDS[cu]
+    # Partial match
+    for key, pid in PLACE_IDS.items():
+        if key in cu or cu in key:
+            return pid
+    return None
 
-/* CARD — idéntica a BASA */
-.sc {
-  background:var(--card-bg); border-radius:14px;
-  border:2px solid var(--border); overflow:hidden;
-  transition:box-shadow .2s, transform .2s;
-}
-.sc:hover { box-shadow:0 8px 32px rgba(0,61,92,.1); transform:translateY(-2px); }
-.sc.ep { border-color:var(--turquesa); }
+# Columnas 0-based
+C_DATE  = 0;  C_CENTRO = 2
+C_ADM   = 3;  C_MED    = 4;  C_ENF  = 5;  C_SEG  = 6;  C_LIMP  = 7
+C_LCAL  = 8;  C_INST   = 9;  C_MENU = 10
+C_STAR  = 11; C_NPS    = 12
+C_ESP   = 15; C_SOL    = 16; C_CMT  = 17; C_PREP = 22
+C_NOMBRE = 18  # S: Nombre del paciente — se usa para filtrar filas de prueba
 
-.sc-header {
-  padding:16px 18px 12px; border-bottom:1px solid var(--border);
-  display:flex; align-items:flex-start; gap:12px;
-}
-.sc-dot { width:10px; height:10px; border-radius:50%; margin-top:5px; flex-shrink:0; }
-.sc-dot.green  { background:var(--turquesa); }
-.sc-dot.yellow { background:var(--yellow); }
-.sc-dot.red    { background:var(--red); }
-.sc-dot.gray   { background:#c0d8e0; }
-.sc-name { font-family:'Nunito',sans-serif; font-size:15px; font-weight:800; line-height:1.2; flex:1; }
-.sc-badges { display:flex; gap:6px; flex-wrap:wrap; margin-top:5px; }
-.badge-ep2  { background:rgba(32,211,194,.15); color:#0d8a80; }
-.badge-noep { background:#f0f4f6; color:var(--muted); }
+PREMIUM_NAMES = ['Swiss Medical','OSDE','Omint','Medicus','Sanidad','Accord Salud','Galeno','Jerárquico']
+PREMIUM_KEYS  = [p.lower() for p in PREMIUM_NAMES] + ['swis medical','jerarquico']
+MIN_N = 5
 
-/* PERIODS */
-.sc-periods { display:grid; grid-template-columns:1fr 1fr 1fr; border-bottom:1px solid var(--border); }
-.sc-period { padding:12px 14px; text-align:center; border-right:1px solid var(--border); }
-.sc-period:last-child { border-right:none; }
-.sc-period-label { font-size:10px; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); margin-bottom:4px; }
-.sc-period-val { font-family:'Nunito',sans-serif; font-size:22px; font-weight:800; line-height:1; }
-.sc-period-val.good { color:#0d8a80; }
-.sc-period-val.warn { color:#b07a00; }
-.sc-period-val.bad  { color:var(--red); }
-.sc-period-val.nd   { color:#b0c8d4; font-size:14px; }
-.sc-period-meta { font-size:11px; color:var(--muted); margin-top:2px; }
-.trend { font-size:14px; }
-.trend.up   { color:var(--turquesa); }
-.trend.down { color:var(--red); }
-.trend.flat { color:var(--muted); }
+# ── UTILS ─────────────────────────────────────────────────────────────────
+def get_token():
+    """Get (or reuse) a Google OAuth2 token via service account JWT."""
+    now = int(time.time())
+    if _token_cache["token"] and now < _token_cache["expires"] - 60:
+        return _token_cache["token"]
 
-/* DIST NPS */
-.sc-dist { padding:12px 16px; border-bottom:1px solid var(--border); }
-.sc-dist-title { font-size:10px; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); margin-bottom:8px; }
-.dist-bars { display:flex; gap:3px; align-items:flex-end; height:44px; }
-.dist-bar-wrap { flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; }
-.dist-bar { width:100%; border-radius:3px 3px 0 0; min-height:3px; }
-.dist-bar.red    { background:#e05252; }
-.dist-bar.yellow { background:#f0b429; }
-.dist-bar.teal   { background:#20d3c2; }
-.dist-n   { font-size:9px; color:var(--muted); font-family:'Nunito',sans-serif; font-weight:700; min-height:11px; }
-.dist-lbl { font-size:9px; color:var(--muted); }
+    import base64
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import padding
+    from cryptography.hazmat.backends import default_backend
 
-/* CSAT */
-.sc-csat { padding:12px 16px; border-bottom:1px solid var(--border); }
-.csat-block { margin-bottom:10px; }
-.csat-block:last-child { margin-bottom:0; }
-.csat-block-title { font-size:10px; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); margin-bottom:6px; font-weight:700; }
-.csat-row { display:flex; align-items:center; gap:8px; margin-bottom:4px; }
-.csat-row:last-child { margin-bottom:0; }
-.csat-row-label { font-size:12px; color:var(--texto); width:130px; flex-shrink:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.csat-bar-bg { flex:1; height:7px; background:#e8f4f8; border-radius:4px; overflow:hidden; }
-.csat-bar-fill { height:100%; border-radius:4px; transition:width .4s; }
-.csat-bar-fill.good { background:var(--turquesa); }
-.csat-bar-fill.warn { background:var(--yellow); }
-.csat-bar-fill.bad  { background:var(--red); }
-.csat-row-val { font-family:'Nunito',sans-serif; font-size:12px; font-weight:700; width:32px; text-align:right; flex-shrink:0; }
+    sa = GOOGLE_SA
+    hdr = base64.urlsafe_b64encode(json.dumps({"alg":"RS256","typ":"JWT"}).encode()).rstrip(b'=').decode()
+    pay = base64.urlsafe_b64encode(json.dumps({
+        "iss": sa["client_email"],
+        "scope": "https://www.googleapis.com/auth/spreadsheets",
+        "aud": "https://oauth2.googleapis.com/token",
+        "iat": now, "exp": now + 3600
+    }).encode()).rstrip(b'=').decode()
+    pk = serialization.load_pem_private_key(sa["private_key"].encode(), password=None, backend=default_backend())
+    sig = base64.urlsafe_b64encode(
+        pk.sign(f"{hdr}.{pay}".encode(), padding.PKCS1v15(), hashes.SHA256())
+    ).rstrip(b'=').decode()
+    jwt = f"{hdr}.{pay}.{sig}"
 
-/* STARS */
-.sc-stars { padding:12px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:12px; }
-.stars-big { font-family:'Nunito',sans-serif; font-size:28px; font-weight:800; }
-.stars-big.good { color:#0d8a80; }
-.stars-big.warn { color:#b07a00; }
-.stars-big.bad  { color:var(--red); }
-.stars-big.nd   { color:#b0c8d4; font-size:16px; }
-.stars-glyphs { font-size:18px; color:var(--yellow); }
-.stars-n { font-size:12px; color:var(--muted); margin-top:2px; }
+    data = urllib.parse.urlencode({
+        "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+        "assertion": jwt
+    }).encode()
+    with urllib.request.urlopen(urllib.request.Request("https://oauth2.googleapis.com/token", data=data)) as r:
+        resp = json.loads(r.read())
+    _token_cache["token"]   = resp["access_token"]
+    _token_cache["expires"] = now + resp.get("expires_in", 3600)
+    return _token_cache["token"]
 
-/* PREPAGAS */
-.sc-prep { padding:12px 16px; border-bottom:1px solid var(--border); }
-.prep-title { font-size:10px; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); margin-bottom:8px; }
-.prep-summary { display:flex; gap:10px; margin-bottom:8px; flex-wrap:wrap; }
-.prep-group { }
-.prep-group-label { font-size:10px; color:var(--muted); margin-bottom:3px; }
-.prep-chips { display:flex; gap:5px; flex-wrap:wrap; margin-top:6px; }
-.prep-chip { padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; font-family:'Nunito',sans-serif; }
-.chip-good { background:rgba(32,211,194,.15); color:#0d8a80; }
-.chip-warn { background:rgba(240,180,41,.18); color:#7a5200; }
-.chip-bad  { background:rgba(224,82,82,.13); color:#a02020; }
-.chip-nd   { background:#f0f4f6; color:#8aa8b4; }
+def fetch_sheet_values(sheet_id):
+    """Read all values from sheet using Sheets API v4 (authenticated)."""
+    token = get_token()
+    url = f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/A1:Z100000"
+    req = urllib.request.Request(url)
+    req.add_header("Authorization", f"Bearer {token}")
+    with urllib.request.urlopen(req) as r:
+        data = json.loads(r.read())
+    rows = data.get("values", [])
+    # Pad rows to same length
+    max_len = max((len(r) for r in rows), default=0)
+    return [r + [''] * (max_len - len(r)) for r in rows]
 
-/* SPARKLINE */
-.sc-sparkline { padding:12px 16px; }
-.spark-title { font-size:10px; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); margin-bottom:6px; }
-.spark-svg { width:100%; height:52px; }
+def fetch_csv(sheet_id, gid="0"):
+    """Kept for compatibility — uses authenticated Sheets API instead of CSV export."""
+    return fetch_sheet_values(sheet_id)
 
-/* AI */
-.sc-ai { padding:12px 16px; border-top:1px solid var(--border); background:rgba(0,61,92,.02); }
-.ai-title { font-size:10px; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); margin-bottom:6px; }
-.ai-text { font-size:12px; color:var(--muted); line-height:1.5; font-style:italic; }
-.ai-tags { display:flex; gap:5px; flex-wrap:wrap; margin-top:6px; }
-.ai-tag { padding:2px 8px; border-radius:20px; background:rgba(0,174,240,.1); color:var(--azul); font-size:11px; }
+def parse_date(s):
+    if not s: return None
+    m = re.match(r'(\d{1,2})/(\d{1,2})/(\d{4})', str(s).strip())
+    if m: return datetime.date(int(m[3]), int(m[2]), int(m[1]))
+    return None
 
-/* ALERTAS */
-.alertas-card {
-  background:var(--card-bg); border-radius:14px;
-  border:2px solid var(--red); overflow:hidden; margin-top:20px;
-}
-.alertas-header {
-  background:#fdf0f0; padding:14px 20px;
-  display:flex; align-items:center; justify-content:space-between;
-  border-bottom:1px solid #f5d0d0;
-}
-.alertas-title { font-family:'Nunito',sans-serif; font-size:14px; font-weight:800; color:var(--red); }
-.alertas-subtitle { font-size:12px; color:var(--muted); margin-top:2px; }
-.alerta-item {
-  padding:14px 20px; border-bottom:1px solid var(--border);
-  display:grid; grid-template-columns:auto 1fr auto; gap:12px; align-items:start;
-}
-.alerta-item:last-child { border-bottom:none; }
-.alerta-item.nuevo { background:rgba(224,82,82,.04); }
-.alerta-item.pendiente { background:rgba(240,180,41,.04); }
-.alerta-item.notificado { background:rgba(32,211,194,.04); opacity:.75; }
-.alerta-badge { padding:2px 8px; border-radius:20px; font-size:10px; font-weight:700; font-family:'Nunito',sans-serif; white-space:nowrap; margin-top:2px; }
-.alerta-badge.nuevo     { background:rgba(224,82,82,.15); color:var(--red); }
-.alerta-badge.pendiente { background:rgba(240,180,41,.18); color:#7a5200; }
-.alerta-badge.notificado{ background:rgba(32,211,194,.15); color:#0d8a80; }
-.alerta-meta { font-size:11px; color:var(--muted); margin-top:4px; line-height:1.5; }
-.alerta-cmt  { font-size:13px; color:var(--texto); margin-top:4px; line-height:1.5; font-style:italic; }
-.alerta-nps  { font-family:'Nunito',sans-serif; font-size:18px; font-weight:800; color:var(--red); flex-shrink:0; padding-top:2px; }
-.alerta-check-wrap { display:flex; flex-direction:column; align-items:center; gap:4px; padding-top:2px; }
-.alerta-check { width:20px; height:20px; cursor:pointer; accent-color:var(--turquesa); }
-.alerta-check-label { font-size:9px; color:var(--muted); text-align:center; line-height:1.2; }
-.alerta-notif-time { font-size:10px; color:#0d8a80; margin-top:3px; }
+def today(): return datetime.date.today()
 
-/* FOOTER */
-#footer { text-align:center; padding:20px 24px; font-size:11px; color:var(--muted); border-top:1px solid var(--border); margin-top:8px; }
-
-@media(max-width:1000px) { #grid { grid-template-columns:1fr; } }
-@media(max-width:600px) {
-  #topbar { flex-wrap:wrap; height:auto; padding:10px 16px; gap:8px; }
-  .centro-hero { flex-direction:column; align-items:flex-start; }
-  #main { padding:14px; }
-}
-</style>
-</head>
-<body>
-
-<!-- LOGIN -->
-<div id="login-screen">
-  <div class="login-box">
-    <div class="login-logo">RED BASA</div>
-    <div class="login-sub">Sanatorio San José</div>
-    <div class="login-desc">Portal de Experiencia del Paciente</div>
-    <input type="password" id="pass-input" placeholder="Contraseña" autocomplete="current-password">
-    <button onclick="doLogin()">Ingresar</button>
-    <div class="login-err" id="login-err"></div>
-  </div>
-</div>
-
-<!-- APP -->
-<div id="app">
-  <div id="topbar">
-    <div class="tb-logo">Red Basa <small>SANATORIO SAN JOSÉ</small></div>
-    <div class="tb-sep"></div>
-    <div class="fin-wrap">
-      <span class="fin-label">Financiador</span>
-      <select class="tb-select" id="fil-fin" onchange="render()">
-        <option value="TODAS">Todos</option>
-        <option value="PREMIUM">Solo premium</option>
-        <option value="NO_PREMIUM">No premium</option>
-        <option value="SIN_DATO">Sin dato</option>
-        <optgroup label="Premium individual">
-          <option value="Swiss Medical">Swiss Medical</option>
-          <option value="OSDE">OSDE</option>
-          <option value="Omint">Omint</option>
-          <option value="Medicus">Medicus</option>
-          <option value="Sanidad">Sanidad</option>
-          <option value="Accord Salud">Accord Salud</option>
-          <option value="Galeno">Galeno</option>
-          <option value="Jerárquico">Jerárquico</option>
-        </optgroup>
-      </select>
-    </div>
-    <div class="tb-sync">
-      <div id="sync-lbl">Cargando…</div>
-      <div id="sync-time"></div>
-    </div>
-  </div>
-
-  <div id="main">
-    <div class="centro-hero">
-      <div class="hero-icon">🏥</div>
-      <div>
-        <div class="hero-name">Sanatorio San José</div>
-        <div class="hero-sub">Red BASA · Portal de Experiencia del Paciente</div>
-        <div class="hero-badges">
-          <span class="badge badge-ep" id="ep-badge">Modelo EP activo</span>
-          <span class="badge badge-info">Datos actualizados diariamente</span>
-        </div>
-      </div>
-    </div>
-
-    <div id="loading-state" class="loading-card">
-      <div class="spinner"></div><br>Cargando resultados…
-    </div>
-
-    <div id="grid" style="display:none"></div>
-    <div id="ai-section" style="display:none;margin-top:20px"></div>
-    <div id="alertas-section" style="display:none"></div>
-  </div>
-
-  <div id="footer">
-    RED BASA · Sanatorio San José · Portal de Experiencia del Paciente · v1 · <span id="footer-date"></span>
-  </div>
-</div>
-
-<script>
-const CENTRO           = 'SANATORIO SAN JOSÉ';
-const PASS_HASH        = '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92';
-const RESULTS_SHEET_ID = '1WhRfeCer_8F_Y3jLUkzY7GGhKHY0XlzN7AyuXbsla8I';
-const NEGATIVE_SHEET   = 'Comentarios Negativos';
-const EP_CONFIG = {
-  'CENTRO GALLEGO DE BUENOS AIRES': { since: '2025-10' },
-  'SANATORIO SAN JOSÉ':             { since: '2026-02' },
-};
-const PREMIUM_NAMES = ['Swiss Medical','OSDE','Omint','Medicus','Sanidad','Accord Salud','Galeno','Jerárquico'];
-const PERIODS     = ['week','month','year'];
-const PLABELS     = ['−1 sem','−1 mes','−1 año'];
-
-let data = {};
-
-// ── LOGIN ─────────────────────────────────────────────────────────────────
-async function sha256(msg) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(msg));
-  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
-}
-async function doLogin() {
-  const val = document.getElementById('pass-input').value;
-  if (await sha256(val) === PASS_HASH) {
-    sessionStorage.setItem('rbsj-auth','1');
-    document.getElementById('login-screen').style.display='none';
-    document.getElementById('app').style.display='block';
-    loadData();
-  } else {
-    document.getElementById('login-err').textContent='Contraseña incorrecta';
-    document.getElementById('pass-input').value='';
-  }
-}
-document.getElementById('pass-input').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
-if(sessionStorage.getItem('rbsj-auth')==='1'){
-  document.getElementById('login-screen').style.display='none';
-  document.getElementById('app').style.display='block';
-}
-
-// ── LOAD ──────────────────────────────────────────────────────────────────
-async function loadData() {
-  try {
-    const url = `https://docs.google.com/spreadsheets/d/${RESULTS_SHEET_ID}/export?format=csv&gid=0`;
-    const resp = await fetch(url);
-    const text = await resp.text();
-    const rows = parseCSV(text);
-    if (rows.length < 2) throw new Error('Sin datos en la hoja de resultados');
-    const header = rows[0];
-    const idx = {};
-    header.forEach((h,i) => idx[h.trim()] = i);
-    data = {};
-    rows.slice(1).forEach(r => {
-      const get = k => (idx[k] !== undefined ? r[idx[k]] : '') || '';
-      const centro  = get('centro').trim();
-      const periodo = get('periodo').trim();
-      const fin     = get('financiador').trim();
-      if (centro !== CENTRO || !periodo || !fin) return;
-      if (!data[periodo]) data[periodo] = {};
-      data[periodo][fin] = {
-        nps:           parseFloat(get('nps'))             || null,
-        n_nps:         parseInt(get('n_nps'))              || 0,
-        nps_prev:      parseFloat(get('nps_prev'))         || null,
-        pct_p:         parseFloat(get('pct_promotores'))   || null,
-        pct_d:         parseFloat(get('pct_detractores'))  || null,
-        csat_rrhh:     parseFloat(get('csat_rrhh'))        || null,
-        csat_confort:  parseFloat(get('csat_confort'))     || null,
-        csat_adic:     parseFloat(get('csat_adic'))        || null,
-        csat_global:   parseFloat(get('csat_global'))      || null,
-        csat_adm:      parseFloat(get('csat_adm'))         || null,
-        csat_med:      parseFloat(get('csat_med'))         || null,
-        csat_enf:      parseFloat(get('csat_enf'))         || null,
-        csat_seg:      parseFloat(get('csat_seg'))         || null,
-        csat_limp:     parseFloat(get('csat_limp'))        || null,
-        csat_limp_cal: parseFloat(get('csat_limp_cal'))    || null,
-        csat_inst:     parseFloat(get('csat_inst'))        || null,
-        csat_menu:     parseFloat(get('csat_menu'))        || null,
-        csat_espera:   parseFloat(get('csat_espera'))      || null,
-        csat_solucion: parseFloat(get('csat_solucion'))    || null,
-        csat_prev:     parseFloat(get('csat_prev'))        || null,
-        estrellas:     parseFloat(get('estrellas'))        || null,
-        n_estrellas:   parseInt(get('n_estrellas'))        || 0,
-        estrellas_prev:parseFloat(get('estrellas_prev'))   || null,
-        dist_nps:      tryJSON(get('dist_nps'), {}),
-        sparkline:     tryJSON(get('sparkline'), []),
-        google_rating:     parseFloat(get('google_rating'))    || null,
-        google_reviews:    parseInt(get('google_reviews'))     || null,
-        google_sparkline:  tryJSON(get('google_sparkline'), []),
-        resumen_ia:    get('resumen_ia'),
-        tags_ia:       get('tags_ia'),
-        fecha:         get('fecha_analisis'),
-      };
-    });
-    const lastUpdate = Object.values(data?.month||{})[0]?.fecha || '';
-    document.getElementById('sync-lbl').textContent = 'Actualizado';
-    document.getElementById('sync-time').textContent = lastUpdate ? `Análisis: ${lastUpdate}` : '';
-    document.getElementById('footer-date').textContent =
-      new Date().toLocaleDateString('es-AR',{day:'numeric',month:'long',year:'numeric'});
-    const ep = EP_CONFIG[CENTRO];
-    if (ep) {
-      const d = new Date(ep.since+'-01');
-      document.getElementById('ep-badge').textContent =
-        'Modelo EP desde '+d.toLocaleDateString('es-AR',{month:'short',year:'numeric'});
-    }
-    document.getElementById('loading-state').style.display='none';
-    document.getElementById('grid').style.display='grid';
-    render();
-    loadAlertas();
-  } catch(e) {
-    document.getElementById('loading-state').innerHTML =
-      `<div style="color:var(--red)">Error cargando resultados: ${e.message}<br>
-      <small>Verificá que RESULTS_SHEET_ID esté configurado y la hoja sea pública.</small></div>`;
-  }
-}
-
-function tryJSON(s,def){try{return JSON.parse(s);}catch{return def;}}
-function parseCSV(txt){
-  const rows=[];let cur=[],cell='',inQ=false;
-  for(let i=0;i<txt.length;i++){
-    const c=txt[i];
-    if(inQ){if(c==='"'&&txt[i+1]==='"'){cell+='"';i++;}else if(c==='"')inQ=false;else cell+=c;}
-    else{if(c==='"')inQ=true;else if(c===','){cur.push(cell.trim());cell='';}
-    else if(c==='\n'){cur.push(cell.trim());rows.push(cur);cur=[];cell='';}
-    else if(c!=='\r')cell+=c;}
-  }
-  if(cell||cur.length){cur.push(cell.trim());rows.push(cur);}
-  return rows;
-}
-
-// ── HELPERS — idénticos a BASA pero con report pasado como parámetro ──────
-function getRow(periodo,fin){ return data[periodo]?.[fin]||null; }
-
-function getVal(row,report){
-  if(!row) return null;
-  if(report==='nps')       return row.nps;
-  if(report==='csat')      return row.csat_global;
-  if(report==='estrellas') return row.estrellas;
-  return null;
-}
-function getPrev(row,report){
-  if(!row) return null;
-  if(report==='nps')       return row.nps_prev;
-  if(report==='csat')      return row.csat_prev;
-  if(report==='estrellas') return row.estrellas_prev;
-  return null;
-}
-function getN(row,report){
-  if(!row) return 0;
-  return report==='estrellas' ? row.n_estrellas : row.n_nps;
-}
-function colorCls(val,report){
-  if(val===null||val===undefined||isNaN(val)) return 'nd';
-  if(report==='nps') return val>=30?'good':val>=0?'warn':'bad';
-  return val>=4?'good':val>=3?'warn':'bad';
-}
-function dispVal(val,report){
-  if(val===null||val===undefined||isNaN(val)) return 'Sin datos';
-  if(report==='nps') return (val>0?'+':'')+Math.round(val);
-  return parseFloat(val).toFixed(1);
-}
-function trendArrow(cur,prev,report){
-  if(cur===null||prev===null||isNaN(cur)||isNaN(prev)) return '';
-  const d=cur-prev, thr=report==='nps'?3:0.1;
-  if(Math.abs(d)<thr) return '<span class="trend flat">→</span>';
-  return d>0?'<span class="trend up">↑</span>':'<span class="trend down">↓</span>';
-}
-
-// ── RENDER UNA CARD — idéntica a renderCard() de BASA ────────────────────
-function renderCard(report) {
-  const fin      = document.getElementById('fil-fin').value || 'TODAS';
-  const curRow   = getRow('month', fin);
-  const curVal   = getVal(curRow, report);
-  const prevVal  = getPrev(curRow, report);
-
-  const dotCls = curVal===null||isNaN(curVal) ? 'gray'
-    : colorCls(curVal,report)==='good'?'green':colorCls(curVal,report)==='warn'?'yellow':'red';
-
-  // Header
-  const reportLabel = {'nps':'NPS','csat':'CSAT','estrellas':'Estrellas'}[report];
-  const epLabel = (() => {
-    const ep = EP_CONFIG[CENTRO];
-    if(!ep) return 'Sin modelo EP';
-    const d = new Date(ep.since+'-01');
-    return 'Modelo EP desde '+d.toLocaleDateString('es-AR',{month:'short',year:'numeric'});
-  })();
-
-  // Period columns
-  const periCols = PERIODS.map((p,i) => {
-    const row = getRow(p, fin);
-    const v   = getVal(row, report);
-    const n   = getN(row, report);
-    const pv  = getPrev(row, report);
-    const act = p==='month';
-    return `<div class="sc-period${act?' active':''}">
-      <div class="sc-period-label">${PLABELS[i]}</div>
-      <div class="sc-period-val ${colorCls(v,report)}">${dispVal(v,report)} ${act?trendArrow(v,pv,report):''}</div>
-      <div class="sc-period-meta">${n} encuestas</div>
-    </div>`;
-  }).join('');
-
-  // Report section
-  let reportSection = '';
-  if (report==='nps') {
-    const dist = curRow?.dist_nps || {};
-    const max  = Math.max(...Object.values(dist), 1);
-    const bars = [1,2,3,4,5,6,7,8,9,10].map(i => {
-      const n = dist[i]||0, h = Math.round((n/max)*32)+3, cls = i<=6?'red':i<=8?'yellow':'teal';
-      return `<div class="dist-bar-wrap">
-        <div class="dist-n">${n>0?n:''}</div>
-        <div class="dist-bar ${cls}" style="height:${h}px"></div>
-        <div class="dist-lbl">${i}</div>
-      </div>`;
-    }).join('');
-    reportSection = `<div class="sc-dist">
-      <div class="sc-dist-title">Distribución puntajes NPS</div>
-      <div class="dist-bars">${bars}</div>
-    </div>`;
-
-  } else if (report==='csat') {
-    const CSAT_BLOCKS = [
-      { title:'Recurso Humano', key:'csat_rrhh', dims:[
-        {label:'Admisionistas',  key:'csat_adm'},
-        {label:'Médicos',        key:'csat_med'},
-        {label:'Enfermeros/as',  key:'csat_enf'},
-        {label:'Seguridad',      key:'csat_seg'},
-        {label:'Limp. personal', key:'csat_limp'},
-      ]},
-      { title:'Confort', key:'csat_confort', dims:[
-        {label:'Limp. centro',   key:'csat_limp_cal'},
-        {label:'Instalaciones',  key:'csat_inst'},
-        {label:'Menú y comidas', key:'csat_menu'},
-      ]},
-      { title:'Atención', key:'csat_adic', dims:[
-        {label:'Tiempo de espera', key:'csat_espera'},
-        {label:'Solución inconv.', key:'csat_solucion'},
-      ]},
-    ];
-    reportSection = `<div class="sc-csat">` + CSAT_BLOCKS.map(block => {
-      const bVal  = curRow?.[block.key] ?? null;
-      const bCls  = colorCls(bVal, 'csat');
-      const bColor= bCls==='good'?'#0d8a80':bCls==='warn'?'#b07a00':bCls==='bad'?'var(--red)':'#b0c8d4';
-      const dimRows = block.dims.map(d => {
-        const v   = curRow?.[d.key] ?? null;
-        const dc  = colorCls(v, 'csat');
-        const pct = v!==null&&!isNaN(v)?((v-1)/4*100).toFixed(0):0;
-        const color=dc==='good'?'#0d8a80':dc==='warn'?'#b07a00':dc==='bad'?'var(--red)':'#b0c8d4';
-        return `<div class="csat-row">
-          <div class="csat-row-label">${d.label}</div>
-          <div class="csat-bar-bg"><div class="csat-bar-fill ${dc}" style="width:${pct}%"></div></div>
-          <div class="csat-row-val" style="color:${color}">${v!==null&&!isNaN(v)?parseFloat(v).toFixed(1):'—'}</div>
-        </div>`;
-      }).join('');
-      return `<div class="csat-block">
-        <div class="csat-block-title" style="display:flex;justify-content:space-between">
-          <span>${block.title}</span>
-          <span style="font-weight:700;color:${bColor}">${bVal!==null&&!isNaN(bVal)?parseFloat(bVal).toFixed(1):''}</span>
-        </div>${dimRows}
-      </div>`;
-    }).join('') + `</div>`;
-
-  } else if (report==='estrellas') {
-    const v = curRow?.estrellas ?? null;
-    const n = curRow?.n_estrellas ?? 0;
-    const cls = colorCls(v,'estrellas');
-    const full = v!==null&&!isNaN(v)?Math.round(v):0;
-    const glyphs = '★'.repeat(Math.max(0,full))+'☆'.repeat(Math.max(0,5-full));
-    reportSection = `<div class="sc-stars">
-      <div class="stars-big ${cls}">${v!==null&&!isNaN(v)?parseFloat(v).toFixed(1):'Sin datos'}</div>
-      <div><div class="stars-glyphs">${glyphs}</div><div class="stars-n">${n} respuestas</div></div>
-    </div>`;
-  }
-
-  // Prepagas — idéntico a BASA
-  const premRow = getRow('month','PREMIUM');
-  const noRow   = getRow('month','NO_PREMIUM');
-  const sinRow  = getRow('month','SIN_DATO');
-  const premV   = getVal(premRow,report), noV=getVal(noRow,report), sinV=getVal(sinRow,report);
-  const indivChips = PREMIUM_NAMES.map(name => {
-    const r = getRow('month',name);
-    const v = getVal(r,report);
-    const n = getN(r,report);
-    if(!n) return '';
-    const cls = colorCls(v,report);
-    return `<span class="prep-chip chip-${cls==='nd'?'nd':cls}">${name.split(' ')[0]} ${dispVal(v,report)} (${n})</span>`;
-  }).filter(Boolean).join('');
-
-  const prepSection = `<div class="sc-prep">
-    <div class="prep-title">Por financiador · −1 mes</div>
-    <div class="prep-summary">
-      <div class="prep-group">
-        <div class="prep-group-label">PREMIUM (${getN(premRow,report)})</div>
-        <span class="prep-chip chip-${colorCls(premV,report)==='nd'?'nd':colorCls(premV,report)}">${dispVal(premV,report)}</span>
-      </div>
-      <div class="prep-group">
-        <div class="prep-group-label">NO PREMIUM (${getN(noRow,report)})</div>
-        <span class="prep-chip chip-${colorCls(noV,report)==='nd'?'nd':colorCls(noV,report)}">${dispVal(noV,report)}</span>
-      </div>
-      <div class="prep-group">
-        <div class="prep-group-label">SIN DATO (${getN(sinRow,report)})</div>
-        <span class="prep-chip chip-${colorCls(sinV,report)==='nd'?'nd':colorCls(sinV,report)}">${dispVal(sinV,report)}</span>
-      </div>
-    </div>
-    ${indivChips?`<div class="prep-chips">${indivChips}</div>`:''}
-  </div>`;
-
-  // Sparkline — idéntico a BASA
-  const sparkData = getRow('month','TODAS')?.sparkline || [];
-  let sparkSection = '';
-  if(sparkData.length >= 2){
-    const key = report==='nps'?'nps':report==='csat'?'csat':'stars';
-    const pts  = sparkData.map(d=>d[key]);
-    const valid= pts.filter(v=>v!==null&&!isNaN(v));
-    if(valid.length>=2){
-      const minV=Math.min(...valid), maxV=Math.max(...valid), range=maxV-minV||1;
-      const W=320, H=44, P=4;
-      let pathD='', prev=null;
-      const coords=pts.map((v,i)=>({
-        x:P+(i/(pts.length-1))*(W-P*2),
-        y:v!==null&&!isNaN(v)?H-P-((v-minV)/range)*(H-P*2):null
-      }));
-      coords.forEach(pt=>{
-        if(pt.y!==null){pathD+=prev?` L${pt.x.toFixed(1)},${pt.y.toFixed(1)}`:`M${pt.x.toFixed(1)},${pt.y.toFixed(1)}`;prev=pt;}
-        else prev=null;
-      });
-      const dots=coords.filter(p=>p.y!==null).map(p=>`<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="2.5" fill="var(--turquesa)"/>`).join('');
-      const rLbl={'nps':'NPS','csat':'CSAT','estrellas':'Estrellas'}[report];
-      const first=sparkData[0]?.m||'', last=sparkData[sparkData.length-1]?.m||'';
-      sparkSection=`<div class="sc-sparkline">
-        <div class="spark-title">Evolución mensual ${rLbl} · 18 meses</div>
-        <svg class="spark-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
-          <path d="${pathD}" fill="none" stroke="var(--turquesa)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-          ${dots}
-        </svg>
-        <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted)"><span>${first}</span><span>${last}</span></div>
-      </div>`;
-    }
-  }
-
-  // Google + AI — en la card de Estrellas
-  let googleSection = '', aiSection = '';
-  if(report==='estrellas'){
-    const gRow = getRow('month','TODAS');
-    if(gRow?.google_rating){
-      const gr=parseFloat(gRow.google_rating);
-      const grev=gRow.google_reviews?`· ${Number(gRow.google_reviews).toLocaleString('es-AR')} reseñas`:'';
-      const gFull=Math.round(gr), gGlyph='★'.repeat(Math.max(0,gFull))+'☆'.repeat(Math.max(0,5-gFull));
-      const gCls=gr>=4?'good':gr>=3?'warn':'bad';
-      const gColor=gCls==='good'?'#0d8a80':gCls==='warn'?'#b07a00':'var(--red)';
-      const gSparkData=gRow.google_sparkline||[];
-      let gSparkSvg='';
-      if(gSparkData.length>=2){
-        const pts=gSparkData.map(d=>d.r??d.rating??null).filter(v=>v!==null);
-        if(pts.length>=2){
-          const minV=Math.min(...pts),maxV=Math.max(...pts),range=maxV-minV||0.5;
-          const W=280,H=36,P=4; let pathD='',prevPt=null;
-          gSparkData.forEach((d,i)=>{
-            const val=d.r??d.rating??null; if(val===null){prevPt=null;return;}
-            const x=P+(i/(gSparkData.length-1))*(W-P*2), y=H-P-((val-minV)/range)*(H-P*2);
-            pathD+=prevPt?` L${x.toFixed(1)},${y.toFixed(1)}`:`M${x.toFixed(1)},${y.toFixed(1)}`; prevPt={x,y};
-          });
-          const first=gSparkData[0]?.m||'',last=gSparkData[gSparkData.length-1]?.m||'';
-          gSparkSvg=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:36px" preserveAspectRatio="none">
-            <path d="${pathD}" fill="none" stroke="#fbbc04" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted)"><span>${first}</span><span>${last}</span></div>`;
-        }
-      }
-      googleSection=`<div class="sc-ai" style="background:rgba(251,188,4,.04);border-top:1px solid var(--border)">
-        <div class="ai-title">Google Maps · actualización mensual</div>
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:${gSparkSvg?'8':'0'}px">
-          <span style="font-family:'Nunito',sans-serif;font-size:24px;font-weight:800;color:${gColor}">${gr.toFixed(1)}</span>
-          <div><div style="font-size:16px;color:#fbbc04">${gGlyph}</div><div style="font-size:11px;color:var(--muted)">${grev}</div></div>
-        </div>
-        ${gSparkSvg?`<div class="spark-title" style="margin-top:4px">Evolución rating Google</div>${gSparkSvg}`:''}
-      </div>`;
-    }
-  }
-
-  return `<div class="sc ep">
-    <div class="sc-header">
-      <div class="sc-dot ${dotCls}"></div>
-      <div>
-        <div class="sc-name">${reportLabel}</div>
-        <div class="sc-badges">
-          <span class="badge badge-ep2">${epLabel}</span>
-        </div>
-      </div>
-    </div>
-    <div class="sc-periods">${periCols}</div>
-    ${reportSection}
-    ${prepSection}
-    ${sparkSection}
-    ${googleSection}
-  </div>`;
-}
-
-// ── REPORT DESCS — mismo texto que index.html ─────────────────────────────
-const REPORT_DESCS = {
-  nps:       '<strong>NPS (Net Promoter Score)</strong> — probabilidad de recomendación 1–10. Promotores (9–10) menos Detractores (1–6). Rango −100 a +100. <strong style="color:#0d8a80">Verde</strong> ≥+30 · <strong style="color:#b07a00">Amarillo</strong> 0–29 · <strong style="color:var(--red)">Rojo</strong> &lt;0.',
-  csat:      '<strong>CSAT (Customer Satisfaction)</strong> — promedio ponderado en escala 1–5 de tres bloques: Recurso Humano, Confort y Atención. <strong style="color:#0d8a80">Verde</strong> ≥4.0 · <strong style="color:#b07a00">Amarillo</strong> 3.0–3.9 · <strong style="color:var(--red)">Rojo</strong> &lt;3.0.',
-  estrellas: '<strong>Estrellas</strong> — calificación general del centro médico en escala 1–5. Representa el CSAT de la clínica en general, completado directamente por el paciente al finalizar su experiencia. <strong style="color:#0d8a80">Verde</strong> ≥4.0 · <strong style="color:#b07a00">Amarillo</strong> 3.0–3.9 · <strong style="color:var(--red)">Rojo</strong> &lt;3.0.',
-};
-
-// ── RENDER ────────────────────────────────────────────────────────────────
-function render(){
-  if(!Object.keys(data).length) return;
-
-  // 3 cards con su descripción arriba de cada una
-  document.getElementById('grid').innerHTML =
-    ['nps','csat','estrellas'].map(r => `
-      <div>
-        <div class="report-desc">${REPORT_DESCS[r]}</div>
-        ${renderCard(r)}
-      </div>
-    `).join('');
-
-  // Análisis IA debajo de los 3 bloques
-  const gRow = getRow('month','TODAS');
-  const aiEl = document.getElementById('ai-section');
-  if(gRow?.resumen_ia){
-    const tagChips=(gRow.tags_ia||'').split(',').filter(Boolean)
-      .map(t=>`<span class="ai-tag">${t.trim()}</span>`).join('');
-    aiEl.innerHTML=`<div class="sc ep" style="padding:16px 18px">
-      <div class="ai-title">Análisis IA · último mes</div>
-      <div class="ai-text">${gRow.resumen_ia}</div>
-      ${tagChips?`<div class="ai-tags" style="margin-top:8px">${tagChips}</div>`:''}
-    </div>`;
-    aiEl.style.display='block';
-  } else {
-    aiEl.style.display='none';
-  }
-}
-
-if(sessionStorage.getItem('rbsj-auth')==='1') loadData();
-
-// ── ALERTAS — Comentarios Negativos ──────────────────────────────────────
-let alertasData = [];
-
-async function loadAlertas() {
-  try {
-    const url = `https://docs.google.com/spreadsheets/d/${RESULTS_SHEET_ID}/export?format=csv&gid=0&sheet=${encodeURIComponent(NEGATIVE_SHEET)}`;
-    // Usamos la API pública de export con nombre de hoja
-    const url2 = `https://docs.google.com/spreadsheets/d/${RESULTS_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(NEGATIVE_SHEET)}`;
-    const resp = await fetch(url2);
-    const text = await resp.text();
-    const rows = parseCSV(text);
-    if(rows.length < 2){ renderAlertas([]); return; }
-    const header = rows[0].map(h => h.trim());
-    const idx = {};
-    header.forEach((h,i) => idx[h] = i);
-    alertasData = rows.slice(1)
-      .map(r => ({
-        id:                r[idx['id']]                || '',
-        fecha_encuesta:    r[idx['fecha_encuesta']]    || '',
-        centro:            r[idx['centro']]            || '',
-        financiador:       r[idx['financiador']]       || '',
-        nps:               r[idx['nps']]               || '',
-        comentario:        r[idx['comentario']]        || '',
-        fecha_deteccion:   r[idx['fecha_deteccion']]   || '',
-        notificado_dm:     r[idx['notificado_dm']]     || '',
-        fecha_notificacion:r[idx['fecha_notificacion']]|| '',
-      }))
-      .filter(a => a.centro === CENTRO && a.comentario);
-    renderAlertas(alertasData);
-  } catch(e) {
-    console.warn('Alertas no disponibles:', e.message);
-    document.getElementById('alertas-section').style.display = 'none';
-  }
-}
-
-function renderAlertas(items) {
-  const el = document.getElementById('alertas-section');
-  if(!items.length){ el.style.display='none'; return; }
-
-  const todayStr = new Date().toISOString().slice(0,10);
-
-  // Clasificar
-  const nuevos    = items.filter(a => !a.notificado_dm && a.fecha_deteccion === todayStr);
-  const pendientes= items.filter(a => !a.notificado_dm && a.fecha_deteccion !== todayStr);
-  const notificados=items.filter(a =>  a.notificado_dm);
-
-  // Ordenar: nuevos primero, luego pendientes por fecha desc, luego notificados
-  const ordered = [
-    ...nuevos.sort((a,b) => b.fecha_encuesta.localeCompare(a.fecha_encuesta)),
-    ...pendientes.sort((a,b) => b.fecha_encuesta.localeCompare(a.fecha_encuesta)),
-    ...notificados.sort((a,b) => b.fecha_notificacion.localeCompare(a.fecha_notificacion)),
-  ];
-
-  const sinAcuse = nuevos.length + pendientes.length;
-
-  const itemsHtml = ordered.map(a => {
-    const isNuevo     = !a.notificado_dm && a.fecha_deteccion === todayStr;
-    const isPendiente = !a.notificado_dm && a.fecha_deteccion !== todayStr;
-    const isNotif     = !!a.notificado_dm;
-    const cls         = isNuevo ? 'nuevo' : isPendiente ? 'pendiente' : 'notificado';
-    const badgeLabel  = isNuevo ? 'Nuevo hoy' : isPendiente ? 'Sin acuse' : 'Notificado';
-
-    // Días sin acuse
-    let demoraHtml = '';
-    if(!isNotif && a.fecha_deteccion){
-      const dias = Math.floor((new Date() - new Date(a.fecha_deteccion)) / 86400000);
-      if(dias > 0) demoraHtml = `<span style="color:var(--red);font-weight:700"> · ${dias}d sin acuse</span>`;
-    }
-    // Tiempo de respuesta si notificado
-    let tiempoRespHtml = '';
-    if(isNotif && a.fecha_notificacion && a.fecha_deteccion){
-      const diff = Math.floor((new Date(a.fecha_notificacion.slice(0,10)) - new Date(a.fecha_deteccion)) / 86400000);
-      tiempoRespHtml = `<div class="alerta-notif-time">✓ Notificado ${a.fecha_notificacion} · respuesta en ${diff === 0 ? 'el mismo día' : diff + 'd'}</div>`;
+def cutoffs():
+    t = today()
+    def safe_month(y, m, d):
+        import calendar
+        last = calendar.monthrange(y, m)[1]
+        return datetime.date(y, m, min(d, last))
+    wk  = t - datetime.timedelta(days=7)
+    mo  = safe_month(t.year if t.month>1 else t.year-1, t.month-1 if t.month>1 else 12, t.day)
+    yr  = safe_month(t.year-1, t.month, t.day)
+    pwk = t - datetime.timedelta(days=14)
+    pmo = safe_month(t.year if t.month>2 else t.year-1, (t.month-2) if t.month>2 else (12+t.month-2), t.day)
+    pyr = safe_month(t.year-2, t.month, t.day)
+    return {
+        'week':  (wk,  t),
+        'month': (mo,  t),
+        'year':  (yr,  t),
+        'prev_week':  (pwk, wk),
+        'prev_month': (pmo, mo),
+        'prev_year':  (pyr, yr),
     }
 
-    return `<div class="alerta-item ${cls}" id="alerta-${a.id}">
-      <div>
-        <span class="alerta-nps">${a.nps ? (a.nps > 0 ? '' : '') + a.nps : '—'}</span>
-      </div>
-      <div>
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          <span class="alerta-badge ${cls}">${badgeLabel}</span>
-          <span style="font-size:11px;color:var(--muted)">${a.fecha_encuesta} · ${a.financiador}</span>
-          ${demoraHtml}
-        </div>
-        <div class="alerta-cmt">"${a.comentario}"</div>
-        ${tiempoRespHtml}
-      </div>
-      <div class="alerta-check-wrap">
-        ${!isNotif ? `
-          <input type="checkbox" class="alerta-check" id="chk-${a.id}"
-            onchange="marcarNotificado('${a.id}', this)">
-          <label for="chk-${a.id}" class="alerta-check-label">Notificado<br>DM</label>
-        ` : `<span style="font-size:16px">✓</span>`}
-      </div>
-    </div>`;
-  }).join('');
+def is_premium(p):
+    if not p: return False
+    pl = p.lower().strip()
+    return any(k in pl for k in PREMIUM_KEYS)
 
-  el.innerHTML = `<div class="alertas-card">
-    <div class="alertas-header">
-      <div>
-        <div class="alertas-title">⚠ Alertas · Comentarios Negativos</div>
-        <div class="alertas-subtitle">${sinAcuse} sin acuse de recibo · ${notificados.length} notificados · desde 1 mayo 2025</div>
-      </div>
-    </div>
-    ${itemsHtml}
-  </div>`;
-  el.style.display = 'block';
-}
+def norm_prepaga(p):
+    """Return canonical premium name or None."""
+    if not p: return None
+    pl = p.lower().strip()
+    for name in PREMIUM_NAMES:
+        if name.lower() in pl: return name
+    if 'swis' in pl: return 'Swiss Medical'
+    if 'jerarquico' in pl or 'jerárquico' in pl: return 'Jerárquico'
+    return None
 
-async function marcarNotificado(id, checkbox) {
-  checkbox.disabled = true;
-  const ahora = new Date().toLocaleString('es-AR', {
-    year:'numeric', month:'2-digit', day:'2-digit',
-    hour:'2-digit', minute:'2-digit', second:'2-digit'
-  });
-  // Buscar fila en alertasData para obtener el índice real en la hoja
-  const idx = alertasData.findIndex(a => a.id === id);
-  if(idx < 0){ checkbox.disabled = false; return; }
+TEXT_MAP = {'muy bueno':5,'muy malo':1,'bueno':4,'malo':2,'regular':3}
+def t2n(v):
+    if not v: return None
+    return TEXT_MAP.get(str(v).lower().strip())
 
-  // El índice en la hoja es idx+2 (1 header + 1-based)
-  const sheetRow = idx + 2;
-  try {
-    // Escribir "DM" en col H (notificado_dm) y fecha en col I (fecha_notificacion)
-    const token = await getGoogleToken();
-    const range  = encodeURIComponent(`'${NEGATIVE_SHEET}'!H${sheetRow}:I${sheetRow}`);
-    const url    = `https://sheets.googleapis.com/v4/spreadsheets/${RESULTS_SHEET_ID}/values/${range}?valueInputOption=RAW`;
-    await fetch(url, {
-      method: 'PUT',
-      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ values: [['DM', ahora]] })
-    });
-    // Actualizar local y re-render
-    alertasData[idx].notificado_dm      = 'DM';
-    alertasData[idx].fecha_notificacion = ahora;
-    renderAlertas(alertasData);
-  } catch(e) {
-    alert('Error al guardar: ' + e.message);
-    checkbox.checked  = false;
-    checkbox.disabled = false;
-  }
-}
+def to_num(v):
+    try: return float(str(v).replace(',','.'))
+    except: return None
 
-// Para escribir en Sheets necesitamos un token — usamos el endpoint público
-// NOTA: la hoja debe ser pública para lectura, pero escritura requiere autenticación.
-// Solución: usar un Google Apps Script como proxy (recomendado) o el token del usuario.
-// Por ahora marcamos vía Apps Script web app (ver instrucciones en README).
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby-ctSWIAtkfvu5-wT-R1Vcj4Yj4hSXfhZ3QphnWqzfZjBIP71RfI_99I16PCeuINfr/exec'; // ← completar con la URL del Apps Script web app
+def invalid(v):
+    if not v: return True
+    s = str(v).lower().strip()
+    return not s or any(x in s for x in ['no tengo','no aplica','no me corresponde','no opinion'])
 
-async function getGoogleToken() {
-  // Si hay Apps Script URL configurada, usarla como proxy
-  if(APPS_SCRIPT_URL) return 'via_apps_script';
-  throw new Error('Configurar APPS_SCRIPT_URL para escritura en Sheets');
-}
+def safe(r, i):
+    return r[i] if i < len(r) else ''
 
-// Override marcarNotificado para usar Apps Script proxy
-async function marcarNotificado(id, checkbox) {
-  if(!APPS_SCRIPT_URL){
-    alert('⚠ Para activar el checkbox configurá el APPS_SCRIPT_URL en el portal.\nVer instrucciones en el README.');
-    checkbox.checked  = false;
-    checkbox.disabled = false;
-    return;
-  }
-  checkbox.disabled = true;
-  const ahora = new Date().toLocaleString('es-AR', {
-    year:'numeric', month:'2-digit', day:'2-digit',
-    hour:'2-digit', minute:'2-digit', second:'2-digit'
-  });
-  const idx = alertasData.findIndex(a => a.id === id);
-  if(idx < 0){ checkbox.disabled = false; return; }
-  try {
-    const resp = await fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      body: JSON.stringify({
-        action: 'marcarNotificado',
-        sheetId: RESULTS_SHEET_ID,
-        sheetName: NEGATIVE_SHEET,
-        id: id,
-        notificado: 'DM',
-        fecha: ahora
-      })
-    });
-    const result = await resp.json();
-    if(result.ok){
-      alertasData[idx].notificado_dm      = 'DM';
-      alertasData[idx].fecha_notificacion = ahora;
-      renderAlertas(alertasData);
-    } else {
-      throw new Error(result.error || 'Error desconocido');
-    }
-  } catch(e) {
-    alert('Error al guardar: ' + e.message);
-    checkbox.checked  = false;
-    checkbox.disabled = false;
-  }
-}
-</script>
-</body>
-</html>
+# ── METRIC CALCS ──────────────────────────────────────────────────────────
+def calc_nps(rows):
+    vals = [v for r in rows for v in [to_num(safe(r,C_NPS))] if v is not None and 1<=v<=10]
+    if len(vals) < MIN_N: return None, len(vals), None, None
+    p = sum(1 for v in vals if v>=9) / len(vals)
+    d = sum(1 for v in vals if v<=6) / len(vals)
+    return round((p-d)*100), len(vals), round(p*100,1), round(d*100,1)
+
+def calc_csat_col(rows, cols, use_text):
+    vals = []
+    for r in rows:
+        for c in cols:
+            v = safe(r,c)
+            if invalid(v): continue
+            n = t2n(v) if use_text else to_num(v)
+            if n is not None and 1<=n<=5: vals.append(n)
+    if len(vals) < MIN_N: return None
+    return round(sum(vals)/len(vals), 2)
+
+def calc_csat(rows):
+    rrhh = calc_csat_col(rows, [C_ADM,C_MED,C_ENF,C_SEG,C_LIMP], True)
+    conf = calc_csat_col(rows, [C_LCAL,C_INST,C_MENU], False)
+    adic = calc_csat_col(rows, [C_ESP,C_SOL], True)
+    parts = [v for v in [rrhh,conf,adic] if v is not None]
+    glob = round(sum(parts)/len(parts),2) if parts else None
+    return rrhh, conf, adic, glob
+
+def calc_stars(rows):
+    vals = [v for r in rows for v in [to_num(safe(r,C_STAR))] if v is not None and 1<=v<=5]
+    if len(vals) < MIN_N: return None, len(vals)
+    return round(sum(vals)/len(vals),2), len(vals)
+
+def calc_dist(rows):
+    """Distribution of NPS scores 1-10."""
+    counts = {i:0 for i in range(1,11)}
+    for r in rows:
+        v = to_num(safe(r,C_NPS))
+        if v is not None and 1<=v<=10:
+            counts[int(v)] += 1
+    return counts
+
+def calc_sparkline(rows):
+    """Monthly NPS/stars for last 18 months. Returns list of {m, nps, stars}."""
+    t = today()
+    result = []
+    for i in range(17,-1,-1):
+        yr  = t.year  + (t.month - 1 - i) // 12 * (1 if (t.month-1-i)>=0 else -1)
+        mo  = ((t.month - 1 - i) % 12) + 1
+        yr  = t.year + ((t.month - 1 - i) // 12)
+        if t.month - 1 - i < 0:
+            yr = t.year - (-(t.month - 1 - i) + 11) // 12
+            mo = 12 - (-(t.month - 1 - i) - 1) % 12
+        label = f"{yr}-{mo:02d}"
+        mrows = [r for r in rows if parse_date(safe(r,C_DATE)) and
+                 parse_date(safe(r,C_DATE)).year==yr and parse_date(safe(r,C_DATE)).month==mo]
+        nps_v, n_nps, *_ = calc_nps(mrows)
+        st_v, n_st       = calc_stars(mrows)
+        _, _, _, csat_v  = calc_csat(mrows)
+        result.append({"m": label, "nps": nps_v, "stars": st_v, "csat": csat_v, "n": len(mrows)})
+    return result
+
+# ── FILTER BY DATE ────────────────────────────────────────────────────────
+def period_rows(rows, start, end):
+    return [r for r in rows if parse_date(safe(r,C_DATE)) and start <= parse_date(safe(r,C_DATE)) <= end]
+
+# ── FINANCIADOR GROUPS ────────────────────────────────────────────────────
+def financiador_rows(rows, fin):
+    if fin == 'TODAS':      return rows
+    if fin == 'PREMIUM':    return [r for r in rows if is_premium(safe(r,C_PREP))]
+    if fin == 'NO_PREMIUM': return [r for r in rows if safe(r,C_PREP) and not is_premium(safe(r,C_PREP))]
+    if fin == 'SIN_DATO':   return [r for r in rows if not safe(r,C_PREP)]
+    # Individual premium name
+    return [r for r in rows if norm_prepaga(safe(r,C_PREP)) == fin]
+
+FINANCIADORES = ['TODAS','PREMIUM','NO_PREMIUM','SIN_DATO'] + PREMIUM_NAMES
+
+# ── GOOGLE AUTH ───────────────────────────────────────────────────────────
+# get_token() is defined above near fetch_sheet_values
+
+def write_sheet(values):
+    token = get_token()
+    url = f"https://sheets.googleapis.com/v4/spreadsheets/{RESULTS_SHEET_ID}/values/{urllib.parse.quote('A1')}?valueInputOption=RAW"
+    body = json.dumps({"values": values}).encode()
+    req = urllib.request.Request(url, data=body, method='PUT')
+    req.add_header('Authorization', f'Bearer {token}')
+    req.add_header('Content-Type', 'application/json')
+    with urllib.request.urlopen(req) as r:
+        return json.loads(r.read())
+
+def clear_sheet():
+    token = get_token()
+    url = f"https://sheets.googleapis.com/v4/spreadsheets/{RESULTS_SHEET_ID}/values/{urllib.parse.quote('A1:Z2000')}:clear"
+    req = urllib.request.Request(url, data=b'{}', method='POST')
+    req.add_header('Authorization', f'Bearer {token}')
+    req.add_header('Content-Type', 'application/json')
+    with urllib.request.urlopen(req) as r: pass
+
+# ── COMENTARIOS NEGATIVOS ─────────────────────────────────────────────────
+NEGATIVE_SHEET_NAME = "Comentarios Negativos"
+NEGATIVE_COMMENTS_HEADER = [
+    "id", "fecha_encuesta", "centro", "financiador", "nps",
+    "comentario", "fecha_deteccion", "notificado_dm", "fecha_notificacion"
+]
+NPS_NEGATIVO_UMBRAL = 4   # NPS ≤ 4
+FECHA_INICIO_ALERTAS = datetime.date(2025, 5, 1)
+
+def ensure_negative_sheet(token):
+    """Create the 'Comentarios Negativos' sheet if it doesn't exist."""
+    url = f"https://sheets.googleapis.com/v4/spreadsheets/{RESULTS_SHEET_ID}"
+    req = urllib.request.Request(url)
+    req.add_header("Authorization", f"Bearer {token}")
+    with urllib.request.urlopen(req) as r:
+        meta = json.loads(r.read())
+    sheets = [s['properties']['title'] for s in meta.get('sheets', [])]
+    if NEGATIVE_SHEET_NAME not in sheets:
+        body = json.dumps({"requests": [{"addSheet": {"properties": {"title": NEGATIVE_SHEET_NAME}}}]}).encode()
+        req2 = urllib.request.Request(
+            f"https://sheets.googleapis.com/v4/spreadsheets/{RESULTS_SHEET_ID}:batchUpdate",
+            data=body, method='POST')
+        req2.add_header("Authorization", f"Bearer {token}")
+        req2.add_header("Content-Type", "application/json")
+        with urllib.request.urlopen(req2) as r:
+            json.loads(r.read())
+        print(f"   ✓ Hoja '{NEGATIVE_SHEET_NAME}' creada")
+        # Write header
+        write_negative_rows([NEGATIVE_COMMENTS_HEADER], token, overwrite_range="'Comentarios Negativos'!A1:I1")
+    else:
+        print(f"   ✓ Hoja '{NEGATIVE_SHEET_NAME}' ya existe")
+
+def read_existing_negative_comments(token):
+    """Read existing negative comments. Returns list of dicts and set of existing keys."""
+    url = f"https://sheets.googleapis.com/v4/spreadsheets/{RESULTS_SHEET_ID}/values/{urllib.parse.quote(NEGATIVE_SHEET_NAME + '!A1:I10000')}"
+    req = urllib.request.Request(url)
+    req.add_header("Authorization", f"Bearer {token}")
+    try:
+        with urllib.request.urlopen(req) as r:
+            data = json.loads(r.read())
+        rows = data.get("values", [])
+        if len(rows) < 2:
+            return [], set()
+        header = rows[0]
+        records = []
+        keys = set()
+        for row in rows[1:]:
+            padded = row + [''] * (len(header) - len(row))
+            rec = dict(zip(header, padded))
+            records.append(rec)
+            # Key: fecha_encuesta + centro + primeros 80 chars del comentario
+            k = f"{rec.get('fecha_encuesta','')}|{rec.get('centro','')}|{rec.get('comentario','')[:80]}"
+            keys.add(k)
+        return records, keys
+    except Exception as e:
+        print(f"   ⚠ Error leyendo comentarios negativos: {e}")
+        return [], set()
+
+def write_negative_rows(values, token, overwrite_range=None):
+    """Append rows to the Comentarios Negativos sheet."""
+    if overwrite_range:
+        url = f"https://sheets.googleapis.com/v4/spreadsheets/{RESULTS_SHEET_ID}/values/{urllib.parse.quote(overwrite_range)}?valueInputOption=RAW"
+        method = 'PUT'
+    else:
+        range_name = urllib.parse.quote(f"{NEGATIVE_SHEET_NAME}!A1")
+        url = f"https://sheets.googleapis.com/v4/spreadsheets/{RESULTS_SHEET_ID}/values/{range_name}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS"
+        method = 'POST'
+    body = json.dumps({"values": values}).encode()
+    req = urllib.request.Request(url, data=body, method=method)
+    req.add_header("Authorization", f"Bearer {token}")
+    req.add_header("Content-Type", "application/json")
+    with urllib.request.urlopen(req) as r:
+        return json.loads(r.read())
+
+NEGATIVE_KEYWORDS = [
+    'mal', 'malo', 'mala', 'pésimo', 'pésima', 'terrible', 'horrible',
+    'demora', 'espera', 'tardaron', 'tarde', 'lento', 'lenta',
+    'maltrato', 'maltrataron', 'grosero', 'grosera', 'descortés',
+    'sucio', 'sucia', 'mugre', 'inmundo', 'desastre',
+    'no atienden', 'no atendieron', 'ignoraron', 'abandonaron',
+    'error', 'equivocaron', 'equivocación', 'negligencia', 'negligente',
+    'queja', 'reclamo', 'indignante', 'vergüenza', 'inaceptable',
+    'no funciona', 'roto', 'falta', 'faltan', 'no hay',
+]
+
+def is_negative_comment(row):
+    """Return True if row has NPS ≤ 4 OR clearly negative comment text."""
+    nps = to_num(safe(row, C_NPS))
+    if nps is not None and nps <= NPS_NEGATIVO_UMBRAL:
+        return True
+    cmt = safe(row, C_CMT).lower().strip()
+    if not cmt or len(cmt) < 10:
+        return False
+    return any(kw in cmt for kw in NEGATIVE_KEYWORDS)
+
+def process_negative_comments(all_rows, token):
+    """Detect new negative comments since FECHA_INICIO_ALERTAS and append to sheet."""
+    print(f"\n5. Procesando comentarios negativos (desde {FECHA_INICIO_ALERTAS})...")
+    ensure_negative_sheet(token)
+    _, existing_keys = read_existing_negative_comments(token)
+
+    new_rows = []
+    today_str = today().isoformat()
+    counter_start = len(existing_keys) + 1
+
+    for row in all_rows:
+        fecha = parse_date(safe(row, C_DATE))
+        if not fecha or fecha < FECHA_INICIO_ALERTAS:
+            continue
+        if not is_negative_comment(row):
+            continue
+        cmt = safe(row, C_CMT).strip()
+        if not cmt:
+            continue
+        centro   = safe(row, C_CENTRO).strip()
+        fin      = norm_prepaga(safe(row, C_PREP)) or ('PREMIUM' if is_premium(safe(row, C_PREP)) else ('NO PREMIUM' if safe(row, C_PREP) else 'SIN DATO'))
+        nps_val  = to_num(safe(row, C_NPS)) or ''
+        key      = f"{fecha.isoformat()}|{centro}|{cmt[:80]}"
+        if key in existing_keys:
+            continue
+        existing_keys.add(key)
+        row_id = f"NC-{counter_start:04d}"
+        counter_start += 1
+        new_rows.append([
+            row_id,
+            fecha.isoformat(),
+            centro,
+            fin,
+            nps_val,
+            cmt,
+            today_str,   # fecha_deteccion
+            '',          # notificado_dm
+            '',          # fecha_notificacion
+        ])
+
+    if new_rows:
+        write_negative_rows(new_rows, token)
+        print(f"   ✓ {len(new_rows)} comentarios nuevos agregados")
+    else:
+        print(f"   ✓ Sin comentarios nuevos")
+
+# ── CLAUDE AI ─────────────────────────────────────────────────────────────
+def analyze_with_ai(centro, neg_comments, nps_val, csat_val, stars_val):
+    if not neg_comments:
+        return "Sin comentarios negativos en el período.", "[]", ""
+    prompt = f"""Sos analista de calidad de atención médica para {centro}.
+
+Métricas del último mes: NPS={nps_val}, CSAT={csat_val}, Estrellas={stars_val}
+
+Comentarios negativos (NPS≤6 o estrellas≤2):
+{chr(10).join(f'- {c}' for c in neg_comments[:30])}
+
+Respondé SOLO con JSON (sin markdown):
+{{"resumen":"2-3 oraciones sobre los problemas principales","problemas":[{{"tema":"...","frecuencia":"alta|media|baja","ejemplo":"..."}}],"tags":["tag1","tag2","tag3"]}}"""
+
+    data = json.dumps({"model":"claude-sonnet-4-6","max_tokens":800,
+                       "messages":[{"role":"user","content":prompt}]}).encode()
+    req = urllib.request.Request("https://api.anthropic.com/v1/messages", data=data)
+    req.add_header('x-api-key', ANTHROPIC_API_KEY)
+    req.add_header('anthropic-version', '2023-06-01')
+    req.add_header('content-type', 'application/json')
+    with urllib.request.urlopen(req) as r:
+        resp = json.loads(r.read())
+    text = resp['content'][0]['text'].strip()
+    try:
+        p = json.loads(text)
+        return p.get('resumen',''), json.dumps(p.get('problemas',[]),ensure_ascii=False), ','.join(p.get('tags',[]))
+    except:
+        return text[:300], '[]', ''
+
+# ── GOOGLE MAPS SCRAPING ─────────────────────────────────────────────────
+def scrape_google_rating(place_id):
+    """
+    Fetch rating and review count from Google Maps for a given Place ID.
+    Uses the public /maps/place URL — no API key required.
+    Returns (rating, review_count) or (None, None) on failure.
+    """
+    url = f"https://www.google.com/maps/place/?q=place_id:{place_id}"
+    req = urllib.request.Request(url)
+    req.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+    req.add_header('Accept-Language', 'es-AR,es;q=0.9')
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:
+            html = r.read().decode('utf-8', errors='ignore')
+
+        # Rating: appears as "4.2" near "estrellas" or in structured data
+        rating = None
+        review_count = None
+
+        # Try structured data first (most reliable)
+        m = re.search(r'"aggregateRating".*?"ratingValue":\s*"?([\d.]+)"?', html)
+        if m:
+            rating = float(m.group(1))
+
+        # Fallback: look for pattern like >4.2< near reviews
+        if not rating:
+            m = re.search(r'(\d\.\d)\s*\([\d,\.]+\s*rese', html)
+            if m:
+                rating = float(m.group(1))
+
+        # Fallback 2: window.APP_INITIALIZATION_STATE data
+        if not rating:
+            m = re.search(r'\[null,(\d\.\d),\d+\]', html)
+            if m:
+                rating = float(m.group(1))
+
+        # Review count
+        m = re.search(r'([\d,\.]+)\s*rese[ñn]as?', html)
+        if m:
+            review_count = int(re.sub(r'[,\.]', '', m.group(1)))
+
+        if not review_count:
+            m = re.search(r'\[null,(\d\.\d),(\d+)\]', html)
+            if m:
+                review_count = int(m.group(2))
+
+        return rating, review_count
+    except Exception as e:
+        print(f"     ⚠ Error scraping {place_id}: {e}")
+        return None, None
+
+def fetch_google_ratings(centros):
+    """Scrape Google Maps ratings for all centros. Returns dict centro→{rating, reviews}."""
+    print("\n4. Scraping Google Maps ratings...")
+    results = {}
+    for centro in centros:
+        pid = match_place_id(centro)
+        if not pid:
+            print(f"   ⚠ Sin Place ID para: {centro}")
+            continue
+        rating, reviews = scrape_google_rating(pid)
+        results[centro] = {'rating': rating, 'reviews': reviews, 'place_id': pid}
+        status = f"★ {rating} ({reviews} reseñas)" if rating else "sin datos"
+        print(f"   {centro[:40]:<40} {status}")
+        time.sleep(1.5)  # rate limit
+    return results
+
+def write_ratings_sheet(token, ratings_by_centro):
+    """Append today's ratings to the Google Ratings sheet."""
+    if not GOOGLE_RATINGS_SHEET:
+        print("   ⚠ GOOGLE_RATINGS_SHEET_ID no configurado, saltando escritura de ratings")
+        return
+    t = today().isoformat()
+    new_rows = []
+    for centro, d in ratings_by_centro.items():
+        if d['rating'] is not None:
+            new_rows.append([centro, t, d['rating'], d['reviews'] or 0])
+    if not new_rows:
+        print("   ⚠ Sin ratings para escribir")
+        return
+    # Append (don't clear — we want historical data)
+    url = f"https://sheets.googleapis.com/v4/spreadsheets/{GOOGLE_RATINGS_SHEET}/values/{urllib.parse.quote('Hoja 1!A:D')}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS"
+    body = json.dumps({"values": new_rows}).encode()
+    req = urllib.request.Request(url, data=body, method='POST')
+    req.add_header('Authorization', f'Bearer {token}')
+    req.add_header('Content-Type', 'application/json')
+    with urllib.request.urlopen(req) as r:
+        json.loads(r.read())
+    print(f"   ✓ {len(new_rows)} ratings escritos")
+
+def read_ratings_history():
+    """Read full ratings history from Google Ratings sheet. Returns dict centro→list of {fecha,rating,reviews}."""
+    if not GOOGLE_RATINGS_SHEET:
+        return {}
+    try:
+        token = get_token()
+        url = f"https://sheets.googleapis.com/v4/spreadsheets/{GOOGLE_RATINGS_SHEET}/values/A1:D10000"
+        req = urllib.request.Request(url)
+        req.add_header("Authorization", f"Bearer {token}")
+        with urllib.request.urlopen(req) as r:
+            data = json.loads(r.read())
+        rows = data.get("values", [])
+        history = {}
+        for row in rows[1:]:  # skip header
+            if len(row) < 3: continue
+            centro, fecha, rating = row[0], row[1], row[2]
+            reviews = int(row[3]) if len(row) > 3 else 0
+            try: rating = float(rating)
+            except: continue
+            if centro not in history:
+                history[centro] = []
+            history[centro].append({'fecha': fecha, 'rating': rating, 'reviews': reviews})
+        return history
+    except Exception as e:
+        print(f"   ⚠ Error leyendo ratings history: {e}")
+        return {}
+
+# ── MAIN ──────────────────────────────────────────────────────────────────
+def main():
+    print("=== Red Basa · Análisis nocturno ===")
+    print(f"Fecha: {today()}")
+
+    print("\n1. Descargando planilla consolidada...")
+    raw = fetch_sheet_values(CONSOLIDATED_SHEET_ID)
+    all_rows = [r for r in raw[1:] if r and len(r)>C_CENTRO and safe(r,C_DATE) and safe(r,C_CENTRO)
+                and 'prueba' not in safe(r,C_NOMBRE).lower()]
+    print(f"   {len(all_rows)} filas cargadas")
+
+    cuts = cutoffs()
+    centros = sorted(set(safe(r,C_CENTRO).strip() for r in all_rows))
+    print(f"   Centros: {centros}")
+
+    # ── GOOGLE RATINGS (se leen de la hoja manual, sin scraping) ─────────
+    print("\n4. Leyendo Google Ratings desde hoja manual...")
+    ratings_history = read_ratings_history()
+
+    HEADER = [
+        "centro","periodo","financiador",
+        "nps","n_nps","pct_promotores","pct_detractores",
+        "csat_rrhh","csat_confort","csat_adic","csat_global",
+        "csat_adm","csat_med","csat_enf","csat_seg","csat_limp",
+        "csat_limp_cal","csat_inst","csat_menu",
+        "csat_espera","csat_solucion",
+        "estrellas","n_estrellas",
+        "nps_prev","csat_prev","estrellas_prev",
+        "dist_nps","sparkline",
+        "google_rating","google_reviews","google_sparkline",
+        "resumen_ia","problemas_ia","tags_ia",
+        "fecha_analisis"
+    ]
+    rows_out = [HEADER]
+    PERIODOS = ['week','month','year']
+
+    print("\n2. Pre-calculando métricas...")
+    for centro in centros:
+        print(f"   → {centro}")
+        crows = [r for r in all_rows if safe(r,C_CENTRO).strip()==centro]
+        sparkline = calc_sparkline(crows)
+
+        # Google rating actual e historial
+        hist = sorted(ratings_history.get(centro, []), key=lambda x: x['fecha'])
+        google_rating    = hist[-1]['rating']  if hist else None
+        google_reviews   = hist[-1]['reviews'] if hist else None
+        google_sparkline = [{'m': h['fecha'], 'r': h['rating']} for h in hist[-18:]]
+
+        # AI analysis
+        month_rows = period_rows(crows, *cuts['month'])
+        neg_cmts = [safe(r,C_CMT) for r in month_rows
+                    if not invalid(safe(r,C_CMT)) and
+                    ((to_num(safe(r,C_NPS)) or 99) <= 6 or (to_num(safe(r,C_STAR)) or 99) <= 2)]
+        nps_m, n_m, *_ = calc_nps(month_rows)
+        _, _, _, csat_m = calc_csat(month_rows)
+        st_m, _         = calc_stars(month_rows)
+        resumen, problemas, tags = analyze_with_ai(centro, neg_cmts, nps_m, csat_m, st_m)
+
+        for periodo in PERIODOS:
+            start, end           = cuts[periodo]
+            prev_start, prev_end = cuts[f'prev_{periodo}']
+            p_rows  = period_rows(crows, start, end)
+            pp_rows = period_rows(crows, prev_start, prev_end)
+            dist    = calc_dist(p_rows)
+
+            for fin in FINANCIADORES:
+                f_rows  = financiador_rows(p_rows, fin)
+                fp_rows = financiador_rows(pp_rows, fin)
+
+                nps_v, n_nps, pct_p, pct_d = calc_nps(f_rows)
+                rrhh, conf, adic, glob      = calc_csat(f_rows)
+                st_v, n_st                  = calc_stars(f_rows)
+                c_adm  = calc_csat_col(f_rows, [C_ADM],  True)
+                c_med  = calc_csat_col(f_rows, [C_MED],  True)
+                c_enf  = calc_csat_col(f_rows, [C_ENF],  True)
+                c_seg  = calc_csat_col(f_rows, [C_SEG],  True)
+                c_limp = calc_csat_col(f_rows, [C_LIMP], True)
+                c_lcal = calc_csat_col(f_rows, [C_LCAL], False)
+                c_inst = calc_csat_col(f_rows, [C_INST], False)
+                c_menu = calc_csat_col(f_rows, [C_MENU], False)
+                c_esp  = calc_csat_col(f_rows, [C_ESP],  True)
+                c_sol  = calc_csat_col(f_rows, [C_SOL],  True)
+                nps_prev, *_ = calc_nps(fp_rows)
+                _, _, _, cp  = calc_csat(fp_rows)
+                st_prev, _   = calc_stars(fp_rows)
+
+                def v(x): return x if x is not None else ''
+
+                rows_out.append([
+                    centro, periodo, fin,
+                    v(nps_v), n_nps, v(pct_p), v(pct_d),
+                    v(rrhh), v(conf), v(adic), v(glob),
+                    v(c_adm), v(c_med), v(c_enf), v(c_seg), v(c_limp),
+                    v(c_lcal), v(c_inst), v(c_menu),
+                    v(c_esp), v(c_sol),
+                    v(st_v), n_st,
+                    v(nps_prev), v(cp), v(st_prev),
+                    json.dumps(dist, ensure_ascii=False)             if fin=='TODAS' else '',
+                    json.dumps(sparkline, ensure_ascii=False)        if fin=='TODAS' and periodo=='month' else '',
+                    v(google_rating)                                 if fin=='TODAS' and periodo=='month' else '',
+                    v(google_reviews)                                if fin=='TODAS' and periodo=='month' else '',
+                    json.dumps(google_sparkline, ensure_ascii=False) if fin=='TODAS' and periodo=='month' else '',
+                    resumen   if fin=='TODAS' and periodo=='month' else '',
+                    problemas if fin=='TODAS' and periodo=='month' else '',
+                    tags      if fin=='TODAS' and periodo=='month' else '',
+                    today().isoformat(),
+                ])
+
+        print(f"     {len(PERIODOS)*len(FINANCIADORES)} filas generadas")
+
+    print(f"\n3. Escribiendo {len(rows_out)-1} filas en Google Sheets...")
+    clear_sheet()
+    write_sheet(rows_out)
+    print("   ✓ Listo")
+    print(f"\nTotal: {len(centros)} centros × {len(PERIODOS)} períodos × {len(FINANCIADORES)} financiadores = {len(rows_out)-1} filas")
+
+    # ── Comentarios negativos
+    token = get_token()
+    process_negative_comments(all_rows, token)
+
+if __name__ == '__main__':
+    main()
