@@ -414,7 +414,7 @@ def read_ratings_history():
             data = json.loads(r.read())
         rows = data.get("values", [])
         history = {}
-        for row in rows:
+        for row in rows[1:]:  # skip header
             if len(row) < 3: continue
             centro, fecha, rating = row[0], row[1], row[2]
             reviews = int(row[3]) if len(row) > 3 else 0
