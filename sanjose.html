@@ -74,7 +74,7 @@ body { font-family:'Nunito Sans',sans-serif; background:var(--fondo); color:var(
 
 /* APP */
 #app { display:none; }
-#main { padding:24px; max-width:1100px; margin:0 auto; }
+#main { padding:24px; max-width:1400px; margin:0 auto; }
 
 /* HERO */
 .centro-hero {
@@ -83,11 +83,7 @@ body { font-family:'Nunito Sans',sans-serif; background:var(--fondo); color:var(
   display:flex; align-items:center; gap:18px;
   border-left:5px solid var(--turquesa);
 }
-.hero-icon {
-  width:48px; height:48px; border-radius:12px;
-  background:rgba(32,211,194,.15); display:flex; align-items:center; justify-content:center;
-  font-size:24px; flex-shrink:0;
-}
+.hero-icon { width:48px; height:48px; border-radius:12px; background:rgba(32,211,194,.15); display:flex; align-items:center; justify-content:center; font-size:24px; flex-shrink:0; }
 .hero-name { font-family:'Nunito',sans-serif; font-size:20px; font-weight:800; line-height:1.2; }
 .hero-sub  { font-size:12px; color:rgba(255,255,255,.5); margin-top:2px; }
 .hero-badges { display:flex; gap:8px; margin-top:7px; flex-wrap:wrap; }
@@ -100,25 +96,33 @@ body { font-family:'Nunito Sans',sans-serif; background:var(--fondo); color:var(
 .spinner { display:inline-block; width:24px; height:24px; border:3px solid var(--border); border-top-color:var(--turquesa); border-radius:50%; animation:spin .8s linear infinite; margin-bottom:10px; }
 @keyframes spin { to { transform:rotate(360deg); } }
 
-/* MAIN CARD — una sola ficha con todo */
-.main-card {
+/* GRID — 3 cards una al lado de la otra */
+#grid { display:grid; grid-template-columns:repeat(3,1fr); gap:20px; }
+
+/* CARD — idéntica a BASA */
+.sc {
   background:var(--card-bg); border-radius:14px;
-  border:2px solid var(--turquesa); overflow:hidden;
-  margin-bottom:20px;
+  border:2px solid var(--border); overflow:hidden;
+  transition:box-shadow .2s, transform .2s;
 }
+.sc:hover { box-shadow:0 8px 32px rgba(0,61,92,.1); transform:translateY(-2px); }
+.sc.ep { border-color:var(--turquesa); }
 
-/* SECTION HEADER (NPS / CSAT / Estrellas) */
-.section-header {
-  background:var(--navy2); padding:10px 18px;
-  display:flex; align-items:center; gap:10px;
+.sc-header {
+  padding:16px 18px 12px; border-bottom:1px solid var(--border);
+  display:flex; align-items:flex-start; gap:12px;
 }
-.section-header-title {
-  font-family:'Nunito',sans-serif; font-size:13px; font-weight:800;
-  color:#fff; text-transform:uppercase; letter-spacing:.06em;
-}
-.section-header-desc { font-size:11px; color:rgba(255,255,255,.45); }
+.sc-dot { width:10px; height:10px; border-radius:50%; margin-top:5px; flex-shrink:0; }
+.sc-dot.green  { background:var(--turquesa); }
+.sc-dot.yellow { background:var(--yellow); }
+.sc-dot.red    { background:var(--red); }
+.sc-dot.gray   { background:#c0d8e0; }
+.sc-name { font-family:'Nunito',sans-serif; font-size:15px; font-weight:800; line-height:1.2; flex:1; }
+.sc-badges { display:flex; gap:6px; flex-wrap:wrap; margin-top:5px; }
+.badge-ep2  { background:rgba(32,211,194,.15); color:#0d8a80; }
+.badge-noep { background:#f0f4f6; color:var(--muted); }
 
-/* PERIOD COLUMNS — 3 columnas dentro de cada bloque */
+/* PERIODS */
 .sc-periods { display:grid; grid-template-columns:1fr 1fr 1fr; border-bottom:1px solid var(--border); }
 .sc-period { padding:12px 14px; text-align:center; border-right:1px solid var(--border); }
 .sc-period:last-child { border-right:none; }
@@ -175,6 +179,7 @@ body { font-family:'Nunito Sans',sans-serif; background:var(--fondo); color:var(
 .sc-prep { padding:12px 16px; border-bottom:1px solid var(--border); }
 .prep-title { font-size:10px; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); margin-bottom:8px; }
 .prep-summary { display:flex; gap:10px; margin-bottom:8px; flex-wrap:wrap; }
+.prep-group { }
 .prep-group-label { font-size:10px; color:var(--muted); margin-bottom:3px; }
 .prep-chips { display:flex; gap:5px; flex-wrap:wrap; margin-top:6px; }
 .prep-chip { padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; font-family:'Nunito',sans-serif; }
@@ -184,28 +189,22 @@ body { font-family:'Nunito Sans',sans-serif; background:var(--fondo); color:var(
 .chip-nd   { background:#f0f4f6; color:#8aa8b4; }
 
 /* SPARKLINE */
-.sc-sparkline { padding:12px 16px; border-bottom:1px solid var(--border); }
+.sc-sparkline { padding:12px 16px; }
 .spark-title { font-size:10px; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); margin-bottom:6px; }
 .spark-svg { width:100%; height:52px; }
 
-/* AI / GOOGLE */
+/* AI */
 .sc-ai { padding:12px 16px; border-top:1px solid var(--border); background:rgba(0,61,92,.02); }
-.sc-google { padding:12px 16px; border-top:1px solid var(--border); background:rgba(251,188,4,.04); }
-.section-label-sm { font-size:10px; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); margin-bottom:6px; }
+.ai-title { font-size:10px; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); margin-bottom:6px; }
 .ai-text { font-size:12px; color:var(--muted); line-height:1.5; font-style:italic; }
 .ai-tags { display:flex; gap:5px; flex-wrap:wrap; margin-top:6px; }
 .ai-tag { padding:2px 8px; border-radius:20px; background:rgba(0,174,240,.1); color:var(--azul); font-size:11px; }
 
 /* FOOTER */
-#footer {
-  text-align:center; padding:20px 24px;
-  font-size:11px; color:var(--muted);
-  border-top:1px solid var(--border);
-  margin-top:4px;
-}
+#footer { text-align:center; padding:20px 24px; font-size:11px; color:var(--muted); border-top:1px solid var(--border); margin-top:8px; }
 
-@media(max-width:700px) {
-  .sc-periods { grid-template-columns:1fr; }
+@media(max-width:1000px) { #grid { grid-template-columns:1fr; } }
+@media(max-width:600px) {
   #topbar { flex-wrap:wrap; height:auto; padding:10px 16px; gap:8px; }
   .centro-hero { flex-direction:column; align-items:flex-start; }
   #main { padding:14px; }
@@ -273,49 +272,7 @@ body { font-family:'Nunito Sans',sans-serif; background:var(--fondo); color:var(
       <div class="spinner"></div><br>Cargando resultados…
     </div>
 
-    <div id="content" style="display:none">
-      <!-- NPS BLOCK -->
-      <div class="main-card" id="block-nps">
-        <div class="section-header">
-          <span class="section-header-title">NPS</span>
-          <span class="section-header-desc">Net Promoter Score · Promotores (9–10) − Detractores (≤6) · Escala −100 a +100 · Verde ≥+30 · Amarillo 0–29 · Rojo &lt;0</span>
-        </div>
-        <div class="sc-periods" id="nps-periods"></div>
-        <div class="sc-dist" id="nps-dist"></div>
-        <div class="sc-prep" id="nps-prep"></div>
-        <div class="sc-sparkline" id="nps-spark"></div>
-      </div>
-
-      <!-- CSAT BLOCK -->
-      <div class="main-card" id="block-csat">
-        <div class="section-header">
-          <span class="section-header-title">CSAT</span>
-          <span class="section-header-desc">Satisfacción · Escala 1–5 · Verde ≥4.0 · Amarillo 3.0–3.9 · Rojo &lt;3.0</span>
-        </div>
-        <div class="sc-periods" id="csat-periods"></div>
-        <div class="sc-csat" id="csat-dims"></div>
-        <div class="sc-prep" id="csat-prep"></div>
-        <div class="sc-sparkline" id="csat-spark"></div>
-      </div>
-
-      <!-- ESTRELLAS BLOCK -->
-      <div class="main-card" id="block-estrellas">
-        <div class="section-header">
-          <span class="section-header-title">Estrellas</span>
-          <span class="section-header-desc">Calificación general · Escala 1–5 · Verde ≥4.0 · Amarillo 3.0–3.9 · Rojo &lt;3.0</span>
-        </div>
-        <div class="sc-periods" id="est-periods"></div>
-        <div id="est-stars"></div>
-        <div class="sc-prep" id="est-prep"></div>
-        <div class="sc-sparkline" id="est-spark"></div>
-      </div>
-
-      <!-- GOOGLE + AI -->
-      <div class="main-card">
-        <div id="google-section"></div>
-        <div id="ai-section"></div>
-      </div>
-    </div>
+    <div id="grid" style="display:none"></div>
   </div>
 
   <div id="footer">
@@ -332,11 +289,8 @@ const EP_CONFIG = {
   'SANATORIO SAN JOSÉ':             { since: '2026-02' },
 };
 const PREMIUM_NAMES = ['Swiss Medical','OSDE','Omint','Medicus','Sanidad','Accord Salud','Galeno','Jerárquico'];
-const PERIODS = [
-  { key:'week',  label:'−1 semana' },
-  { key:'month', label:'−1 mes'   },
-  { key:'year',  label:'−1 año'   },
-];
+const PERIODS     = ['week','month','year'];
+const PLABELS     = ['−1 sem','−1 mes','−1 año'];
 
 let data = {};
 
@@ -383,38 +337,40 @@ async function loadData() {
       if (centro !== CENTRO || !periodo || !fin) return;
       if (!data[periodo]) data[periodo] = {};
       data[periodo][fin] = {
-        nps:          parseFloat(get('nps'))            || null,
-        n_nps:        parseInt(get('n_nps'))             || 0,
-        nps_prev:     parseFloat(get('nps_prev'))        || null,
-        csat_rrhh:    parseFloat(get('csat_rrhh'))       || null,
-        csat_confort: parseFloat(get('csat_confort'))    || null,
-        csat_adic:    parseFloat(get('csat_adic'))       || null,
-        csat_global:  parseFloat(get('csat_global'))     || null,
-        csat_adm:     parseFloat(get('csat_adm'))        || null,
-        csat_med:     parseFloat(get('csat_med'))        || null,
-        csat_enf:     parseFloat(get('csat_enf'))        || null,
-        csat_seg:     parseFloat(get('csat_seg'))        || null,
-        csat_limp:    parseFloat(get('csat_limp'))       || null,
-        csat_limp_cal:parseFloat(get('csat_limp_cal'))   || null,
-        csat_inst:    parseFloat(get('csat_inst'))       || null,
-        csat_menu:    parseFloat(get('csat_menu'))       || null,
-        csat_espera:  parseFloat(get('csat_espera'))     || null,
-        csat_solucion:parseFloat(get('csat_solucion'))   || null,
-        csat_prev:    parseFloat(get('csat_prev'))       || null,
-        estrellas:    parseFloat(get('estrellas'))       || null,
-        n_estrellas:  parseInt(get('n_estrellas'))       || 0,
-        estrellas_prev: parseFloat(get('estrellas_prev'))|| null,
-        dist_nps:     tryJSON(get('dist_nps'), {}),
-        sparkline:    tryJSON(get('sparkline'), []),
-        google_rating:    parseFloat(get('google_rating'))    || null,
-        google_reviews:   parseInt(get('google_reviews'))     || null,
-        google_sparkline: tryJSON(get('google_sparkline'), []),
-        resumen_ia:   get('resumen_ia'),
-        tags_ia:      get('tags_ia'),
-        fecha:        get('fecha_analisis'),
+        nps:           parseFloat(get('nps'))             || null,
+        n_nps:         parseInt(get('n_nps'))              || 0,
+        nps_prev:      parseFloat(get('nps_prev'))         || null,
+        pct_p:         parseFloat(get('pct_promotores'))   || null,
+        pct_d:         parseFloat(get('pct_detractores'))  || null,
+        csat_rrhh:     parseFloat(get('csat_rrhh'))        || null,
+        csat_confort:  parseFloat(get('csat_confort'))     || null,
+        csat_adic:     parseFloat(get('csat_adic'))        || null,
+        csat_global:   parseFloat(get('csat_global'))      || null,
+        csat_adm:      parseFloat(get('csat_adm'))         || null,
+        csat_med:      parseFloat(get('csat_med'))         || null,
+        csat_enf:      parseFloat(get('csat_enf'))         || null,
+        csat_seg:      parseFloat(get('csat_seg'))         || null,
+        csat_limp:     parseFloat(get('csat_limp'))        || null,
+        csat_limp_cal: parseFloat(get('csat_limp_cal'))    || null,
+        csat_inst:     parseFloat(get('csat_inst'))        || null,
+        csat_menu:     parseFloat(get('csat_menu'))        || null,
+        csat_espera:   parseFloat(get('csat_espera'))      || null,
+        csat_solucion: parseFloat(get('csat_solucion'))    || null,
+        csat_prev:     parseFloat(get('csat_prev'))        || null,
+        estrellas:     parseFloat(get('estrellas'))        || null,
+        n_estrellas:   parseInt(get('n_estrellas'))        || 0,
+        estrellas_prev:parseFloat(get('estrellas_prev'))   || null,
+        dist_nps:      tryJSON(get('dist_nps'), {}),
+        sparkline:     tryJSON(get('sparkline'), []),
+        google_rating:     parseFloat(get('google_rating'))    || null,
+        google_reviews:    parseInt(get('google_reviews'))     || null,
+        google_sparkline:  tryJSON(get('google_sparkline'), []),
+        resumen_ia:    get('resumen_ia'),
+        tags_ia:       get('tags_ia'),
+        fecha:         get('fecha_analisis'),
       };
     });
-    const lastUpdate = Object.values(data?.month || {})[0]?.fecha || '';
+    const lastUpdate = Object.values(data?.month||{})[0]?.fecha || '';
     document.getElementById('sync-lbl').textContent = 'Actualizado';
     document.getElementById('sync-time').textContent = lastUpdate ? `Análisis: ${lastUpdate}` : '';
     document.getElementById('footer-date').textContent =
@@ -426,7 +382,7 @@ async function loadData() {
         'Modelo EP desde '+d.toLocaleDateString('es-AR',{month:'short',year:'numeric'});
     }
     document.getElementById('loading-state').style.display='none';
-    document.getElementById('content').style.display='block';
+    document.getElementById('grid').style.display='grid';
     render();
   } catch(e) {
     document.getElementById('loading-state').innerHTML =
@@ -449,236 +405,288 @@ function parseCSV(txt){
   return rows;
 }
 
-// ── HELPERS ───────────────────────────────────────────────────────────────
-function getRow(periodo,fin){return data[periodo]?.[fin]||null;}
+// ── HELPERS — idénticos a BASA pero con report pasado como parámetro ──────
+function getRow(periodo,fin){ return data[periodo]?.[fin]||null; }
 
-function colorNPS(v){ if(v===null||isNaN(v)) return 'nd'; return v>=30?'good':v>=0?'warn':'bad'; }
-function colorCSAT(v){ if(v===null||isNaN(v)) return 'nd'; return v>=4?'good':v>=3?'warn':'bad'; }
-function dispNPS(v){ if(v===null||isNaN(v)) return 'Sin datos'; return (v>0?'+':'')+Math.round(v); }
-function dispCSAT(v){ if(v===null||isNaN(v)) return 'Sin datos'; return parseFloat(v).toFixed(1); }
-
-function trendArrow(cur,prev,isNps){
+function getVal(row,report){
+  if(!row) return null;
+  if(report==='nps')       return row.nps;
+  if(report==='csat')      return row.csat_global;
+  if(report==='estrellas') return row.estrellas;
+  return null;
+}
+function getPrev(row,report){
+  if(!row) return null;
+  if(report==='nps')       return row.nps_prev;
+  if(report==='csat')      return row.csat_prev;
+  if(report==='estrellas') return row.estrellas_prev;
+  return null;
+}
+function getN(row,report){
+  if(!row) return 0;
+  return report==='estrellas' ? row.n_estrellas : row.n_nps;
+}
+function colorCls(val,report){
+  if(val===null||val===undefined||isNaN(val)) return 'nd';
+  if(report==='nps') return val>=30?'good':val>=0?'warn':'bad';
+  return val>=4?'good':val>=3?'warn':'bad';
+}
+function dispVal(val,report){
+  if(val===null||val===undefined||isNaN(val)) return 'Sin datos';
+  if(report==='nps') return (val>0?'+':'')+Math.round(val);
+  return parseFloat(val).toFixed(1);
+}
+function trendArrow(cur,prev,report){
   if(cur===null||prev===null||isNaN(cur)||isNaN(prev)) return '';
-  const d=cur-prev, thr=isNps?3:0.1;
+  const d=cur-prev, thr=report==='nps'?3:0.1;
   if(Math.abs(d)<thr) return '<span class="trend flat">→</span>';
   return d>0?'<span class="trend up">↑</span>':'<span class="trend down">↓</span>';
 }
 
-function renderPeriodCols(report){
-  const fin=document.getElementById('fil-fin').value||'TODAS';
-  return PERIODS.map(p=>{
-    const row=getRow(p.key,fin);
-    let v,prev,n,cls,disp;
-    if(report==='nps'){
-      v=row?.nps??null; prev=row?.nps_prev??null; n=row?.n_nps||0;
-      cls=colorNPS(v); disp=dispNPS(v);
-    } else if(report==='csat'){
-      v=row?.csat_global??null; prev=row?.csat_prev??null; n=row?.n_nps||0;
-      cls=colorCSAT(v); disp=dispCSAT(v);
-    } else {
-      v=row?.estrellas??null; prev=row?.estrellas_prev??null; n=row?.n_estrellas||0;
-      cls=colorCSAT(v); disp=dispCSAT(v);
-    }
-    const isNps=report==='nps';
-    return `<div class="sc-period">
-      <div class="sc-period-label">${p.label}</div>
-      <div class="sc-period-val ${cls}">${disp} ${trendArrow(v,prev,isNps)}</div>
+// ── RENDER UNA CARD — idéntica a renderCard() de BASA ────────────────────
+function renderCard(report) {
+  const fin      = document.getElementById('fil-fin').value || 'TODAS';
+  const curRow   = getRow('month', fin);
+  const curVal   = getVal(curRow, report);
+  const prevVal  = getPrev(curRow, report);
+
+  const dotCls = curVal===null||isNaN(curVal) ? 'gray'
+    : colorCls(curVal,report)==='good'?'green':colorCls(curVal,report)==='warn'?'yellow':'red';
+
+  // Header
+  const reportLabel = {'nps':'NPS','csat':'CSAT','estrellas':'Estrellas'}[report];
+  const epLabel = (() => {
+    const ep = EP_CONFIG[CENTRO];
+    if(!ep) return 'Sin modelo EP';
+    const d = new Date(ep.since+'-01');
+    return 'Modelo EP desde '+d.toLocaleDateString('es-AR',{month:'short',year:'numeric'});
+  })();
+
+  // Period columns
+  const periCols = PERIODS.map((p,i) => {
+    const row = getRow(p, fin);
+    const v   = getVal(row, report);
+    const n   = getN(row, report);
+    const pv  = getPrev(row, report);
+    const act = p==='month';
+    return `<div class="sc-period${act?' active':''}">
+      <div class="sc-period-label">${PLABELS[i]}</div>
+      <div class="sc-period-val ${colorCls(v,report)}">${dispVal(v,report)} ${act?trendArrow(v,pv,report):''}</div>
       <div class="sc-period-meta">${n} encuestas</div>
     </div>`;
   }).join('');
-}
 
-function renderPrepSection(report, periodKey){
-  const fin=document.getElementById('fil-fin').value||'TODAS';
-  const premRow=getRow(periodKey,'PREMIUM'), noRow=getRow(periodKey,'NO_PREMIUM'), sinRow=getRow(periodKey,'SIN_DATO');
-  function vOf(row){ if(!row) return null;
-    if(report==='nps') return row.nps;
-    if(report==='csat') return row.csat_global;
-    return row.estrellas; }
-  function nOf(row){ if(!row) return 0; return report==='estrellas'?row.n_estrellas:row.n_nps; }
-  function cls(v){ return report==='nps'?colorNPS(v):colorCSAT(v); }
-  function disp(v){ return report==='nps'?dispNPS(v):dispCSAT(v); }
-  const premV=vOf(premRow), noV=vOf(noRow), sinV=vOf(sinRow);
-  const chips=PREMIUM_NAMES.map(name=>{
-    const r=getRow(periodKey,name), v=vOf(r), n=nOf(r);
-    if(!n) return '';
-    const c=cls(v);
-    return `<span class="prep-chip chip-${c==='nd'?'nd':c}">${name.split(' ')[0]} ${disp(v)} (${n})</span>`;
-  }).filter(Boolean).join('');
-  return `<div class="prep-title">Por financiador · último mes</div>
-    <div class="prep-summary">
-      <div><div class="prep-group-label">PREMIUM (${nOf(premRow)})</div>
-        <span class="prep-chip chip-${cls(premV)==='nd'?'nd':cls(premV)}">${disp(premV)}</span></div>
-      <div><div class="prep-group-label">NO PREMIUM (${nOf(noRow)})</div>
-        <span class="prep-chip chip-${cls(noV)==='nd'?'nd':cls(noV)}">${disp(noV)}</span></div>
-      <div><div class="prep-group-label">SIN DATO (${nOf(sinRow)})</div>
-        <span class="prep-chip chip-${cls(sinV)==='nd'?'nd':cls(sinV)}">${disp(sinV)}</span></div>
-    </div>
-    ${chips?`<div class="prep-chips">${chips}</div>`:''}`;
-}
-
-function renderSparkline(sparkData, key, label){
-  if(!sparkData||sparkData.length<2) return '';
-  const pts=sparkData.map(d=>d[key]);
-  const valid=pts.filter(v=>v!==null&&!isNaN(v));
-  if(valid.length<2) return '';
-  const minV=Math.min(...valid),maxV=Math.max(...valid),range=maxV-minV||1;
-  const W=600,H=44,P=4;
-  let pathD='',prev=null;
-  const coords=pts.map((v,i)=>({
-    x:P+(i/(pts.length-1))*(W-P*2),
-    y:v!==null&&!isNaN(v)?H-P-((v-minV)/range)*(H-P*2):null
-  }));
-  coords.forEach(pt=>{
-    if(pt.y!==null){pathD+=prev?` L${pt.x.toFixed(1)},${pt.y.toFixed(1)}`:`M${pt.x.toFixed(1)},${pt.y.toFixed(1)}`;prev=pt;}
-    else prev=null;
-  });
-  const dots=coords.filter(p=>p.y!==null).map(p=>`<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="2.5" fill="var(--turquesa)"/>`).join('');
-  const first=sparkData[0]?.m||'',last=sparkData[sparkData.length-1]?.m||'';
-  return `<div class="spark-title">Evolución mensual ${label} · 18 meses</div>
-    <svg class="spark-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
-      <path d="${pathD}" fill="none" stroke="var(--turquesa)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-      ${dots}
-    </svg>
-    <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted)"><span>${first}</span><span>${last}</span></div>`;
-}
-
-// ── MAIN RENDER ───────────────────────────────────────────────────────────
-function render(){
-  if(!Object.keys(data).length) return;
-  const monthRow=getRow('month','TODAS');
-  const sparkData=monthRow?.sparkline||[];
-
-  // ── NPS ──
-  document.getElementById('nps-periods').innerHTML = renderPeriodCols('nps');
-
-  const distRow=getRow('month',document.getElementById('fil-fin').value||'TODAS');
-  const dist=distRow?.dist_nps||{};
-  const max=Math.max(...Object.values(dist),1);
-  const bars=[1,2,3,4,5,6,7,8,9,10].map(i=>{
-    const n=dist[i]||0, h=Math.round((n/max)*32)+3, bc=i<=6?'red':i<=8?'yellow':'teal';
-    return `<div class="dist-bar-wrap">
-      <div class="dist-n">${n>0?n:''}</div>
-      <div class="dist-bar ${bc}" style="height:${h}px"></div>
-      <div class="dist-lbl">${i}</div>
-    </div>`;
-  }).join('');
-  document.getElementById('nps-dist').innerHTML=`<div class="sc-dist-title">Distribución puntajes · último mes</div><div class="dist-bars">${bars}</div>`;
-  document.getElementById('nps-prep').innerHTML=renderPrepSection('nps','month');
-  document.getElementById('nps-spark').innerHTML=renderSparkline(sparkData,'nps','NPS');
-
-  // ── CSAT ──
-  document.getElementById('csat-periods').innerHTML = renderPeriodCols('csat');
-
-  const csatRow=getRow('month',document.getElementById('fil-fin').value||'TODAS');
-  const BLOCKS=[
-    {title:'Recurso Humano',key:'csat_rrhh',dims:[
-      {label:'Admisionistas', key:'csat_adm'},
-      {label:'Médicos',       key:'csat_med'},
-      {label:'Enfermeros/as', key:'csat_enf'},
-      {label:'Seguridad',     key:'csat_seg'},
-      {label:'Limp. personal',key:'csat_limp'},
-    ]},
-    {title:'Confort',key:'csat_confort',dims:[
-      {label:'Limp. centro',  key:'csat_limp_cal'},
-      {label:'Instalaciones', key:'csat_inst'},
-      {label:'Menú y comidas',key:'csat_menu'},
-    ]},
-    {title:'Atención',key:'csat_adic',dims:[
-      {label:'Tiempo de espera',key:'csat_espera'},
-      {label:'Solución inconv.',key:'csat_solucion'},
-    ]},
-  ];
-  document.getElementById('csat-dims').innerHTML=BLOCKS.map(block=>{
-    const bVal=csatRow?.[block.key]??null;
-    const bCls=colorCSAT(bVal);
-    const bColor=bCls==='good'?'#0d8a80':bCls==='warn'?'#b07a00':bCls==='bad'?'var(--red)':'#b0c8d4';
-    const dimRows=block.dims.map(d=>{
-      const v=csatRow?.[d.key]??null;
-      const dc=colorCSAT(v);
-      const pct=v!==null&&!isNaN(v)?((v-1)/4*100).toFixed(0):0;
-      const color=dc==='good'?'#0d8a80':dc==='warn'?'#b07a00':dc==='bad'?'var(--red)':'#b0c8d4';
-      return `<div class="csat-row">
-        <div class="csat-row-label">${d.label}</div>
-        <div class="csat-bar-bg"><div class="csat-bar-fill ${dc}" style="width:${pct}%"></div></div>
-        <div class="csat-row-val" style="color:${color}">${v!==null&&!isNaN(v)?parseFloat(v).toFixed(1):'—'}</div>
+  // Report section
+  let reportSection = '';
+  if (report==='nps') {
+    const dist = curRow?.dist_nps || {};
+    const max  = Math.max(...Object.values(dist), 1);
+    const bars = [1,2,3,4,5,6,7,8,9,10].map(i => {
+      const n = dist[i]||0, h = Math.round((n/max)*32)+3, cls = i<=6?'red':i<=8?'yellow':'teal';
+      return `<div class="dist-bar-wrap">
+        <div class="dist-n">${n>0?n:''}</div>
+        <div class="dist-bar ${cls}" style="height:${h}px"></div>
+        <div class="dist-lbl">${i}</div>
       </div>`;
     }).join('');
-    return `<div class="csat-block">
-      <div class="csat-block-title" style="display:flex;justify-content:space-between">
-        <span>${block.title}</span>
-        <span style="font-weight:700;color:${bColor}">${bVal!==null&&!isNaN(bVal)?parseFloat(bVal).toFixed(1):''}</span>
-      </div>${dimRows}
+    reportSection = `<div class="sc-dist">
+      <div class="sc-dist-title">Distribución puntajes NPS</div>
+      <div class="dist-bars">${bars}</div>
     </div>`;
-  }).join('');
-  document.getElementById('csat-prep').innerHTML=renderPrepSection('csat','month');
-  document.getElementById('csat-spark').innerHTML=renderSparkline(sparkData,'csat','CSAT');
 
-  // ── ESTRELLAS ──
-  document.getElementById('est-periods').innerHTML = renderPeriodCols('estrellas');
+  } else if (report==='csat') {
+    const CSAT_BLOCKS = [
+      { title:'Recurso Humano', key:'csat_rrhh', dims:[
+        {label:'Admisionistas',  key:'csat_adm'},
+        {label:'Médicos',        key:'csat_med'},
+        {label:'Enfermeros/as',  key:'csat_enf'},
+        {label:'Seguridad',      key:'csat_seg'},
+        {label:'Limp. personal', key:'csat_limp'},
+      ]},
+      { title:'Confort', key:'csat_confort', dims:[
+        {label:'Limp. centro',   key:'csat_limp_cal'},
+        {label:'Instalaciones',  key:'csat_inst'},
+        {label:'Menú y comidas', key:'csat_menu'},
+      ]},
+      { title:'Atención', key:'csat_adic', dims:[
+        {label:'Tiempo de espera', key:'csat_espera'},
+        {label:'Solución inconv.', key:'csat_solucion'},
+      ]},
+    ];
+    reportSection = `<div class="sc-csat">` + CSAT_BLOCKS.map(block => {
+      const bVal  = curRow?.[block.key] ?? null;
+      const bCls  = colorCls(bVal, 'csat');
+      const bColor= bCls==='good'?'#0d8a80':bCls==='warn'?'#b07a00':bCls==='bad'?'var(--red)':'#b0c8d4';
+      const dimRows = block.dims.map(d => {
+        const v   = curRow?.[d.key] ?? null;
+        const dc  = colorCls(v, 'csat');
+        const pct = v!==null&&!isNaN(v)?((v-1)/4*100).toFixed(0):0;
+        const color=dc==='good'?'#0d8a80':dc==='warn'?'#b07a00':dc==='bad'?'var(--red)':'#b0c8d4';
+        return `<div class="csat-row">
+          <div class="csat-row-label">${d.label}</div>
+          <div class="csat-bar-bg"><div class="csat-bar-fill ${dc}" style="width:${pct}%"></div></div>
+          <div class="csat-row-val" style="color:${color}">${v!==null&&!isNaN(v)?parseFloat(v).toFixed(1):'—'}</div>
+        </div>`;
+      }).join('');
+      return `<div class="csat-block">
+        <div class="csat-block-title" style="display:flex;justify-content:space-between">
+          <span>${block.title}</span>
+          <span style="font-weight:700;color:${bColor}">${bVal!==null&&!isNaN(bVal)?parseFloat(bVal).toFixed(1):''}</span>
+        </div>${dimRows}
+      </div>`;
+    }).join('') + `</div>`;
 
-  const estRow=getRow('month',document.getElementById('fil-fin').value||'TODAS');
-  const ev=estRow?.estrellas??null, en=estRow?.n_estrellas??0;
-  const ec=colorCSAT(ev), full=ev!==null&&!isNaN(ev)?Math.round(ev):0;
-  const glyphs='★'.repeat(Math.max(0,full))+'☆'.repeat(Math.max(0,5-full));
-  document.getElementById('est-stars').innerHTML=`<div class="sc-stars">
-    <div class="stars-big ${ec}">${ev!==null&&!isNaN(ev)?parseFloat(ev).toFixed(1):'Sin datos'}</div>
-    <div><div class="stars-glyphs">${glyphs}</div><div class="stars-n">${en} respuestas · último mes</div></div>
+  } else if (report==='estrellas') {
+    const v = curRow?.estrellas ?? null;
+    const n = curRow?.n_estrellas ?? 0;
+    const cls = colorCls(v,'estrellas');
+    const full = v!==null&&!isNaN(v)?Math.round(v):0;
+    const glyphs = '★'.repeat(Math.max(0,full))+'☆'.repeat(Math.max(0,5-full));
+    reportSection = `<div class="sc-stars">
+      <div class="stars-big ${cls}">${v!==null&&!isNaN(v)?parseFloat(v).toFixed(1):'Sin datos'}</div>
+      <div><div class="stars-glyphs">${glyphs}</div><div class="stars-n">${n} respuestas</div></div>
+    </div>`;
+  }
+
+  // Prepagas — idéntico a BASA
+  const premRow = getRow('month','PREMIUM');
+  const noRow   = getRow('month','NO_PREMIUM');
+  const sinRow  = getRow('month','SIN_DATO');
+  const premV   = getVal(premRow,report), noV=getVal(noRow,report), sinV=getVal(sinRow,report);
+  const indivChips = PREMIUM_NAMES.map(name => {
+    const r = getRow('month',name);
+    const v = getVal(r,report);
+    const n = getN(r,report);
+    if(!n) return '';
+    const cls = colorCls(v,report);
+    return `<span class="prep-chip chip-${cls==='nd'?'nd':cls}">${name.split(' ')[0]} ${dispVal(v,report)} (${n})</span>`;
+  }).filter(Boolean).join('');
+
+  const prepSection = `<div class="sc-prep">
+    <div class="prep-title">Por financiador · −1 mes</div>
+    <div class="prep-summary">
+      <div class="prep-group">
+        <div class="prep-group-label">PREMIUM (${getN(premRow,report)})</div>
+        <span class="prep-chip chip-${colorCls(premV,report)==='nd'?'nd':colorCls(premV,report)}">${dispVal(premV,report)}</span>
+      </div>
+      <div class="prep-group">
+        <div class="prep-group-label">NO PREMIUM (${getN(noRow,report)})</div>
+        <span class="prep-chip chip-${colorCls(noV,report)==='nd'?'nd':colorCls(noV,report)}">${dispVal(noV,report)}</span>
+      </div>
+      <div class="prep-group">
+        <div class="prep-group-label">SIN DATO (${getN(sinRow,report)})</div>
+        <span class="prep-chip chip-${colorCls(sinV,report)==='nd'?'nd':colorCls(sinV,report)}">${dispVal(sinV,report)}</span>
+      </div>
+    </div>
+    ${indivChips?`<div class="prep-chips">${indivChips}</div>`:''}
   </div>`;
-  document.getElementById('est-prep').innerHTML=renderPrepSection('estrellas','month');
-  document.getElementById('est-spark').innerHTML=renderSparkline(sparkData,'stars','Estrellas');
 
-  // ── GOOGLE ──
-  let googleHtml='';
-  if(monthRow?.google_rating){
-    const gr=parseFloat(monthRow.google_rating);
-    const grev=monthRow.google_reviews?`${Number(monthRow.google_reviews).toLocaleString('es-AR')} reseñas`:'';
-    const gFull=Math.round(gr), gGlyph='★'.repeat(Math.max(0,gFull))+'☆'.repeat(Math.max(0,5-gFull));
-    const gCls=gr>=4?'good':gr>=3?'warn':'bad';
-    const gColor=gCls==='good'?'#0d8a80':gCls==='warn'?'#b07a00':'var(--red)';
-    const gSparkData=monthRow.google_sparkline||[];
-    let gSparkSvg='';
-    if(gSparkData.length>=2){
-      const pts=gSparkData.map(d=>d.r??d.rating??null).filter(v=>v!==null);
-      if(pts.length>=2){
-        const minV=Math.min(...pts),maxV=Math.max(...pts),range=maxV-minV||0.5;
-        const W=600,H=36,P=4;let pathD='',prevPt=null;
-        gSparkData.forEach((d,i)=>{
-          const val=d.r??d.rating??null;if(val===null){prevPt=null;return;}
-          const x=P+(i/(gSparkData.length-1))*(W-P*2),y=H-P-((val-minV)/range)*(H-P*2);
-          pathD+=prevPt?` L${x.toFixed(1)},${y.toFixed(1)}`:`M${x.toFixed(1)},${y.toFixed(1)}`;prevPt={x,y};
-        });
-        const first=gSparkData[0]?.m||'',last=gSparkData[gSparkData.length-1]?.m||'';
-        gSparkSvg=`<div class="spark-title" style="margin-top:8px">Evolución rating Google</div>
-          <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:40px" preserveAspectRatio="none">
+  // Sparkline — idéntico a BASA
+  const sparkData = getRow('month','TODAS')?.sparkline || [];
+  let sparkSection = '';
+  if(sparkData.length >= 2){
+    const key = report==='nps'?'nps':report==='csat'?'csat':'stars';
+    const pts  = sparkData.map(d=>d[key]);
+    const valid= pts.filter(v=>v!==null&&!isNaN(v));
+    if(valid.length>=2){
+      const minV=Math.min(...valid), maxV=Math.max(...valid), range=maxV-minV||1;
+      const W=320, H=44, P=4;
+      let pathD='', prev=null;
+      const coords=pts.map((v,i)=>({
+        x:P+(i/(pts.length-1))*(W-P*2),
+        y:v!==null&&!isNaN(v)?H-P-((v-minV)/range)*(H-P*2):null
+      }));
+      coords.forEach(pt=>{
+        if(pt.y!==null){pathD+=prev?` L${pt.x.toFixed(1)},${pt.y.toFixed(1)}`:`M${pt.x.toFixed(1)},${pt.y.toFixed(1)}`;prev=pt;}
+        else prev=null;
+      });
+      const dots=coords.filter(p=>p.y!==null).map(p=>`<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="2.5" fill="var(--turquesa)"/>`).join('');
+      const rLbl={'nps':'NPS','csat':'CSAT','estrellas':'Estrellas'}[report];
+      const first=sparkData[0]?.m||'', last=sparkData[sparkData.length-1]?.m||'';
+      sparkSection=`<div class="sc-sparkline">
+        <div class="spark-title">Evolución mensual ${rLbl} · 18 meses</div>
+        <svg class="spark-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+          <path d="${pathD}" fill="none" stroke="var(--turquesa)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          ${dots}
+        </svg>
+        <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted)"><span>${first}</span><span>${last}</span></div>
+      </div>`;
+    }
+  }
+
+  // Google + AI — solo en la card de NPS (primera)
+  let googleSection = '', aiSection = '';
+  if(report==='nps'){
+    const gRow = getRow('month','TODAS');
+    if(gRow?.google_rating){
+      const gr=parseFloat(gRow.google_rating);
+      const grev=gRow.google_reviews?`· ${Number(gRow.google_reviews).toLocaleString('es-AR')} reseñas`:'';
+      const gFull=Math.round(gr), gGlyph='★'.repeat(Math.max(0,gFull))+'☆'.repeat(Math.max(0,5-gFull));
+      const gCls=gr>=4?'good':gr>=3?'warn':'bad';
+      const gColor=gCls==='good'?'#0d8a80':gCls==='warn'?'#b07a00':'var(--red)';
+      const gSparkData=gRow.google_sparkline||[];
+      let gSparkSvg='';
+      if(gSparkData.length>=2){
+        const pts=gSparkData.map(d=>d.r??d.rating??null).filter(v=>v!==null);
+        if(pts.length>=2){
+          const minV=Math.min(...pts),maxV=Math.max(...pts),range=maxV-minV||0.5;
+          const W=280,H=36,P=4; let pathD='',prevPt=null;
+          gSparkData.forEach((d,i)=>{
+            const val=d.r??d.rating??null; if(val===null){prevPt=null;return;}
+            const x=P+(i/(gSparkData.length-1))*(W-P*2), y=H-P-((val-minV)/range)*(H-P*2);
+            pathD+=prevPt?` L${x.toFixed(1)},${y.toFixed(1)}`:`M${x.toFixed(1)},${y.toFixed(1)}`; prevPt={x,y};
+          });
+          const first=gSparkData[0]?.m||'',last=gSparkData[gSparkData.length-1]?.m||'';
+          gSparkSvg=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:36px" preserveAspectRatio="none">
             <path d="${pathD}" fill="none" stroke="#fbbc04" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
           <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted)"><span>${first}</span><span>${last}</span></div>`;
+        }
       }
+      googleSection=`<div class="sc-ai" style="background:rgba(251,188,4,.04);border-top:1px solid var(--border)">
+        <div class="ai-title">Google Maps · actualización mensual</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:${gSparkSvg?'8':'0'}px">
+          <span style="font-family:'Nunito',sans-serif;font-size:24px;font-weight:800;color:${gColor}">${gr.toFixed(1)}</span>
+          <div><div style="font-size:16px;color:#fbbc04">${gGlyph}</div><div style="font-size:11px;color:var(--muted)">${grev}</div></div>
+        </div>
+        ${gSparkSvg?`<div class="spark-title" style="margin-top:4px">Evolución rating Google</div>${gSparkSvg}`:''}
+      </div>`;
     }
-    googleHtml=`<div class="sc-google">
-      <div class="section-label-sm">Google Maps · actualización mensual</div>
-      <div style="display:flex;align-items:center;gap:10px">
-        <span style="font-family:'Nunito',sans-serif;font-size:24px;font-weight:800;color:${gColor}">${gr.toFixed(1)}</span>
-        <div><div style="font-size:16px;color:#fbbc04">${gGlyph}</div><div style="font-size:11px;color:var(--muted)">${grev}</div></div>
-      </div>
-      ${gSparkSvg}
-    </div>`;
+    if(gRow?.resumen_ia){
+      const tagChips=(gRow.tags_ia||'').split(',').filter(Boolean)
+        .map(t=>`<span class="ai-tag">${t.trim()}</span>`).join('');
+      aiSection=`<div class="sc-ai">
+        <div class="ai-title">Análisis IA · último mes</div>
+        <div class="ai-text">${gRow.resumen_ia}</div>
+        ${tagChips?`<div class="ai-tags">${tagChips}</div>`:''}
+      </div>`;
+    }
   }
-  document.getElementById('google-section').innerHTML=googleHtml;
 
-  // ── AI ──
-  let aiHtml='';
-  if(monthRow?.resumen_ia){
-    const tagChips=(monthRow.tags_ia||'').split(',').filter(Boolean)
-      .map(t=>`<span class="ai-tag">${t.trim()}</span>`).join('');
-    aiHtml=`<div class="sc-ai">
-      <div class="section-label-sm">Análisis IA · último mes</div>
-      <div class="ai-text">${monthRow.resumen_ia}</div>
-      ${tagChips?`<div class="ai-tags">${tagChips}</div>`:''}
-    </div>`;
-  }
-  document.getElementById('ai-section').innerHTML=aiHtml;
+  return `<div class="sc ep">
+    <div class="sc-header">
+      <div class="sc-dot ${dotCls}"></div>
+      <div>
+        <div class="sc-name">${reportLabel}</div>
+        <div class="sc-badges">
+          <span class="badge badge-ep2">${epLabel}</span>
+        </div>
+      </div>
+    </div>
+    <div class="sc-periods">${periCols}</div>
+    ${reportSection}
+    ${prepSection}
+    ${sparkSection}
+    ${googleSection}
+    ${aiSection}
+  </div>`;
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────────
+function render(){
+  if(!Object.keys(data).length) return;
+  document.getElementById('grid').innerHTML =
+    ['nps','csat','estrellas'].map(r => renderCard(r)).join('');
 }
 
 if(sessionStorage.getItem('rbsj-auth')==='1') loadData();
