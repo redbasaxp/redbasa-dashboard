@@ -924,8 +924,13 @@ async function marcarNotificado(id, checkbox) {
       notificado: 'DM',
       fecha:      ahora
     });
-    await fetch(`${APPS_SCRIPT_URL}?${params}`, { mode: 'no-cors' });
-    // no-cors no devuelve body — asumimos éxito si no hay excepción
+    // Usamos Image() para evitar CORB — no requiere CORS
+    await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = img.onerror = resolve; // resolvemos en ambos casos
+      img.src = `${APPS_SCRIPT_URL}?${params}`;
+      setTimeout(resolve, 3000); // timeout de seguridad
+    });
     alertasData[idx].notificado_dm      = 'DM';
     alertasData[idx].fecha_notificacion = ahora;
     renderAlertas(alertasData);
