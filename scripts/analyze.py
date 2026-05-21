@@ -456,6 +456,14 @@ Respondé SOLO con JSON (sin markdown):
         print(f"     ⚠ API error: {e}")
         return "Error en análisis IA.", '[]', ''
     text = resp['content'][0]['text'].strip()
+    # Limpiar markdown fences si el modelo los incluye
+    text = re.sub(r'^```(?:json)?\s*', '', text, flags=re.MULTILINE)
+    text = re.sub(r'```\s*$', '', text, flags=re.MULTILINE)
+    text = text.strip()
+    # Extraer solo el objeto JSON si hay texto extra
+    match = re.search(r'\{.*\}', text, re.DOTALL)
+    if match:
+        text = match.group(0)
     try:
         p = json.loads(text)
         return p.get('resumen',''), json.dumps(p.get('problemas',[]),ensure_ascii=False), ','.join(p.get('tags',[]))
