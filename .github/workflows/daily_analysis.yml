@@ -21,12 +21,13 @@ jobs:
 
       - name: Run analysis
         env:
-          ANTHROPIC_API_KEY:      ${{ secrets.ANTHROPIC_API_KEY }}
-          GOOGLE_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
-          RESULTS_SHEET_ID:       ${{ secrets.RESULTS_SHEET_ID }}
+          ANTHROPIC_API_KEY:       ${{ secrets.ANTHROPIC_API_KEY }}
+          GOOGLE_SERVICE_ACCOUNT:  ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
+          RESULTS_SHEET_ID:        ${{ secrets.RESULTS_SHEET_ID }}
           GOOGLE_RATINGS_SHEET_ID: ${{ secrets.GOOGLE_RATINGS_SHEET_ID }}
         run: python scripts/analyze.py
+
       - name: Test Todoist SSJ
         env:
-        TODOIST_SSJ: ${{ secrets.TODOIST_SSJ }}
+          TODOIST_SSJ: ${{ secrets.TODOIST_SSJ }}
         run: python scripts/test_todoist.py
