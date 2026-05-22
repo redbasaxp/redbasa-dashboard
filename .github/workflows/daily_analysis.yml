@@ -27,6 +27,13 @@ jobs:
           GOOGLE_RATINGS_SHEET_ID: ${{ secrets.GOOGLE_RATINGS_SHEET_ID }}
         run: python scripts/analyze.py
 
+      - name: Sync Todoist
+        env:
+          GOOGLE_SERVICE_ACCOUNT:  ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
+          RESULTS_SHEET_ID:        ${{ secrets.RESULTS_SHEET_ID }}
+          TODOIST_SSJ:             ${{ secrets.TODOIST_SSJ }}
+        run: python scripts/todoist_sync.py
+
       - name: Test Todoist SSJ
         env:
           TODOIST_SSJ: ${{ secrets.TODOIST_SSJ }}
