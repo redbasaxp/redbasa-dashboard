@@ -568,11 +568,13 @@ def ensure_cobertura_sheet(token):
 
 def write_cobertura_rows(rows, token):
     """Sobreescribe la hoja Cobertura EP."""
-    range_name = urllib.parse.quote(f"'{COBERTURA_SHEET_NAME}'!A1")
-    # Clear
-    url_clear = f"https://sheets.googleapis.com/v4/spreadsheets/{RESULTS_SHEET_ID}/values/{range_name}:clear"
+    sheet_quoted = urllib.parse.quote(COBERTURA_SHEET_NAME)
+    range_name   = urllib.parse.quote(f"'{COBERTURA_SHEET_NAME}'!A1")
+    # Clear entire sheet
+    url_clear = f"https://sheets.googleapis.com/v4/spreadsheets/{RESULTS_SHEET_ID}/values/{sheet_quoted}:clear"
     req = urllib.request.Request(url_clear, data=b'{}', method='POST')
     req.add_header("Authorization", f"Bearer {token}")
+    req.add_header("Content-Type", "application/json")
     with urllib.request.urlopen(req):
         pass
     # Write
@@ -677,13 +679,11 @@ Respondé SOLO con JSON válido (sin markdown, sin texto extra, máximo 800 cara
     match = re.search(r'\{.*\}', text, re.DOTALL)
     if match:
         text = match.group(0)
-    print(f"     DEBUG AI text[:100]: {text[:100]}")
     try:
         p = json.loads(text)
         resumen   = p.get('resumen','')
         problemas = json.dumps(p.get('problemas',[]), ensure_ascii=False)
         tags      = ','.join(p.get('tags',[]))
-        print(f"     DEBUG parsed ok: resumen={resumen[:50]}")
         return resumen, problemas, tags
     except Exception as ex:
         print(f"     DEBUG parse error: {ex} | text: {text[:200]}")
