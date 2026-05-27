@@ -609,12 +609,14 @@ def get_all_altas_from_sheet(sheet_id, hoja, token):
     if len(rows) < 2:
         return []
 
-    # Buscar header con columnas relevantes
+    # Buscar el primer header que tenga TANTO Fecha Alta COMO Calificación Clinica
     header_idx, header = None, []
     for i, row in enumerate(rows):
         rl = [str(c).strip().lower() for c in row]
-        if any('fecha alta' in c or c == 'alta' for c in rl) and \
-           any('encuesta' in c or 'nombre' in c or 'paciente' in c for c in rl):
+        has_alta  = any('fecha alta' in c or c == 'alta' for c in rl)
+        has_calif = any('calificaci' in c for c in rl)
+        has_paciente = any('encuesta' in c or 'nombre' in c or 'paciente' in c for c in rl)
+        if has_alta and has_calif and has_paciente:
             header_idx = i
             header = rl
             break
@@ -634,8 +636,12 @@ def get_all_altas_from_sheet(sheet_id, hoja, token):
         if not row or not any(str(c).strip() for c in row[:4]):
             continue
         primera = str(row[0]).strip().lower()
-        if primera in ('', 'nombre del paciente', 'f', 'rango fechas', 'totales', 'semana actual'):
-            continue
+        # Parar si encontramos otro bloque de header (sección de internados, resumen, etc.)
+        if primera in ('nombre del paciente', 'f', 'rango fechas', 'totales', 'semana actual'):
+            break
+        # Ignorar filas de resumen semanal (primera columna vacía pero tiene "rango fechas" en col 1)
+        if len(row) > 1 and 'rango' in str(row[1]).lower():
+            break
 
         # Excluir Duplicados
         enc = str(row[col_enc]).strip().lower() if col_enc is not None and col_enc < len(row) else ''
