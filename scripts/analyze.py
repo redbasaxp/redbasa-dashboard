@@ -425,6 +425,219 @@ def process_negative_comments(all_rows, token):
     else:
         print(f"   ✓ Sin comentarios nuevos")
 
+# ── COBERTURA EP ──────────────────────────────────────────────────────────
+COBERTURA_SHEET_NAME = "Cobertura EP"
+COBERTURA_HEADER = [
+    "centro", "ep_desde",
+    "altas_total", "encuestas_total", "pct_cobertura_total",
+    "altas_semana", "encuestas_semana", "pct_cobertura_semana",
+    "altas_mes",   "encuestas_mes",   "pct_cobertura_mes",
+    "altas_anio",  "encuestas_anio",  "pct_cobertura_anio",
+    "fecha_actualizacion"
+]
+
+# Planillas de trabajo EP — sheet_id + nombre de hoja donde están los pacientes
+EP_PLANILLAS = {
+    "SANATORIO SAN JOSÉ": {
+        "ep_desde": "2026-02",
+        "fuentes": [
+            {"sheet_id": "1cUW3oHoNPhpKpppkGPlab7EcG0rrlrvFxKJvOkr4g5Y", "hoja": "pacientes"},
+        ]
+    },
+    "CENTRO GALLEGO DE BUENOS AIRES": {
+        "ep_desde": "2025-10",
+        "fuentes": [
+            {"sheet_id": "1eawLlhFCNc0-jw3I8ljkmvwpTt-G66ZRE3aqq0Ofxvw", "hoja": "pacientes"},
+            {"sheet_id": "1ac-_Ifkwzs5bUsFw1JxPeIiSPtETPZIBP5JpFmkPHO0",  "hoja": "altas"},
+        ]
+    },
+    "SANTA CLARA FLORENCIO VARELA": {
+        "ep_desde": "2026-05",
+        "fuentes": [
+            {"sheet_id": "1X9IlYWOqsEvD7OB4uRkGuEjmbZRAyuKX5G-WIhXumII", "hoja": "pacientes"},
+        ]
+    },
+}
+
+def parse_fecha_flexible(s):
+    """Intenta parsear fechas en formato DD/MM/YYYY, YYYY-MM-DD, D/M/YYYY."""
+    s = s.strip()
+    if not s:
+        return None
+    # Tomar solo la parte de fecha (ignorar hora)
+    s = s.split(' ')[0].split('\t')[0]
+    for fmt in ('%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y', '%m/%d/%Y'):
+        try:
+            return datetime.datetime.strptime(s, fmt).date()
+        except:
+            pass
+    return None
+
+def count_altas_from_sheet(sheet_id, hoja, token, desde=None, hasta=None):
+    """
+    Lee la hoja de trabajo EP y cuenta filas con Fecha Alta no vacía,
+    excluyendo Duplicados. Filtra por rango de fechas si se indica.
+    """
+    range_name = urllib.parse.quote(f"'{hoja}'!A1:Z3000")
+    url = f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/{range_name}"
+    req = urllib.request.Request(url)
+    req.add_header("Authorization", f"Bearer {token}")
+    try:
+        with urllib.request.urlopen(req) as r:
+            data = json.loads(r.read())
+    except Exception as e:
+        print(f"     ⚠ Error leyendo {sheet_id}/{hoja}: {e}")
+        return 0
+
+    rows = data.get("values", [])
+    if len(rows) < 2:
+        return 0
+
+    # Encontrar el primer header con columnas relevantes
+    header_idx, header = None, []
+    for i, row in enumerate(rows):
+        rl = [str(c).strip().lower() for c in row]
+        if any('fecha alta' in c or c == 'alta' for c in rl) and \
+           any('encuesta' in c or 'nombre' in c or 'paciente' in c for c in rl):
+            header_idx = i
+            header = rl
+            break
+
+    if header_idx is None:
+        return 0
+
+    # Índices clave
+    col_enc   = next((i for i, h in enumerate(header) if 'encuesta' in h), None)
+    col_alta  = next((i for i, h in enumerate(header)
+                      if 'fecha alta' in h or h == 'alta'), None)
+
+    if col_alta is None:
+        return 0
+
+    count = 0
+    for row in rows[header_idx + 1:]:
+        if not row or not any(str(c).strip() for c in row[:4]):
+            continue
+        # Parar si parece otro bloque de header o resumen
+        primera = str(row[0]).strip().lower()
+        if primera in ('', 'nombre del paciente', 'rango fechas', 'totales', 'semana actual'):
+            continue
+
+        # Excluir Duplicados
+        enc = str(row[col_enc]).strip().lower() if col_enc is not None and col_enc < len(row) else ''
+        if enc == 'duplicado':
+            continue
+
+        # Verificar que tenga fecha de alta
+        alta_str = str(row[col_alta]).strip() if col_alta < len(row) else ''
+        if not alta_str or alta_str in ('-', ''):
+            continue
+
+        fecha_alta = parse_fecha_flexible(alta_str)
+        if fecha_alta is None:
+            continue
+
+        # Filtrar por rango si aplica
+        if desde and fecha_alta < desde:
+            continue
+        if hasta and fecha_alta > hasta:
+            continue
+
+        count += 1
+
+    return count
+
+def ensure_cobertura_sheet(token):
+    """Crea la hoja Cobertura EP si no existe."""
+    url = f"https://sheets.googleapis.com/v4/spreadsheets/{RESULTS_SHEET_ID}"
+    req = urllib.request.Request(url)
+    req.add_header("Authorization", f"Bearer {token}")
+    with urllib.request.urlopen(req) as r:
+        meta = json.loads(r.read())
+    sheets = [s['properties']['title'] for s in meta.get('sheets', [])]
+    if COBERTURA_SHEET_NAME not in sheets:
+        body = json.dumps({"requests": [{"addSheet": {"properties": {"title": COBERTURA_SHEET_NAME}}}]}).encode()
+        req2 = urllib.request.Request(
+            f"https://sheets.googleapis.com/v4/spreadsheets/{RESULTS_SHEET_ID}:batchUpdate",
+            data=body, method='POST')
+        req2.add_header("Authorization", f"Bearer {token}")
+        req2.add_header("Content-Type", "application/json")
+        with urllib.request.urlopen(req2):
+            pass
+        print(f"   ✓ Hoja '{COBERTURA_SHEET_NAME}' creada")
+
+def write_cobertura_rows(rows, token):
+    """Sobreescribe la hoja Cobertura EP."""
+    range_name = urllib.parse.quote(f"'{COBERTURA_SHEET_NAME}'!A1")
+    # Clear
+    url_clear = f"https://sheets.googleapis.com/v4/spreadsheets/{RESULTS_SHEET_ID}/values/{range_name}:clear"
+    req = urllib.request.Request(url_clear, data=b'{}', method='POST')
+    req.add_header("Authorization", f"Bearer {token}")
+    with urllib.request.urlopen(req):
+        pass
+    # Write
+    url_write = f"https://sheets.googleapis.com/v4/spreadsheets/{RESULTS_SHEET_ID}/values/{range_name}?valueInputOption=RAW"
+    body = json.dumps({"values": rows}).encode()
+    req2 = urllib.request.Request(url_write, data=body, method='PUT')
+    req2.add_header("Authorization", f"Bearer {token}")
+    req2.add_header("Content-Type", "application/json")
+    with urllib.request.urlopen(req2):
+        pass
+
+def process_cobertura_ep(token, centro_encuestas):
+    """
+    Lee planillas EP, cuenta altas por rango, cruza con encuestas
+    ya calculadas de la planilla consolidada, escribe hoja Cobertura EP.
+    centro_encuestas: dict {centro: {periodo: n_nps}} ya calculado en main()
+    """
+    print(f"\n6. Procesando cobertura EP...")
+    ensure_cobertura_sheet(token)
+
+    hoy   = today()
+    # Rangos de fechas (mismos que PERIODOS en main)
+    ranges = {
+        'semana': (hoy - datetime.timedelta(days=7),   hoy),
+        'mes':    (hoy - datetime.timedelta(days=30),  hoy),
+        'anio':   (hoy - datetime.timedelta(days=365), hoy),
+        'total':  (None, None),
+    }
+
+    rows_out = [COBERTURA_HEADER]
+    for centro, cfg in EP_PLANILLAS.items():
+        enc = centro_encuestas.get(centro, {})
+
+        altas = {}
+        for periodo, (desde, hasta) in ranges.items():
+            total = 0
+            for fuente in cfg["fuentes"]:
+                total += count_altas_from_sheet(
+                    fuente["sheet_id"], fuente["hoja"], token, desde, hasta)
+            altas[periodo] = total
+
+        def pct(enc_n, alt_n):
+            if alt_n == 0: return 0
+            return round(enc_n / alt_n * 100, 1)
+
+        enc_sem  = enc.get('week',  0) or 0
+        enc_mes  = enc.get('month', 0) or 0
+        enc_anio = enc.get('year',  0) or 0
+        enc_tot  = enc_anio  # usamos año como proxy de total visible
+
+        row = [
+            centro,
+            cfg["ep_desde"],
+            altas['total'],  enc_tot,  pct(enc_tot,  altas['total']),
+            altas['semana'], enc_sem,  pct(enc_sem,  altas['semana']),
+            altas['mes'],    enc_mes,  pct(enc_mes,  altas['mes']),
+            altas['anio'],   enc_anio, pct(enc_anio, altas['anio']),
+            hoy.isoformat(),
+        ]
+        rows_out.append(row)
+        print(f"   {centro}: total={altas['total']} altas | mes={altas['mes']} altas / {enc_mes} enc ({pct(enc_mes, altas['mes'])}%)")
+
+    write_cobertura_rows(rows_out, token)
+    print(f"   ✓ Cobertura EP escrita")
+
 # ── CLAUDE AI ─────────────────────────────────────────────────────────────
 def analyze_with_ai(centro, neg_comments, nps_val, csat_val, stars_val):
     if not neg_comments:
@@ -712,6 +925,20 @@ def main():
     # ── Comentarios negativos
     token = get_token()
     process_negative_comments(all_rows, token)
+
+    # ── Cobertura EP — construir dict de encuestas por centro/período
+    centro_encuestas = {}
+    for row in rows_out[1:]:  # saltar header
+        centro_n = row[0]
+        periodo_n = row[1]
+        fin_n = row[2]
+        if fin_n != 'TODAS':
+            continue
+        n = row[4]  # n_nps
+        if centro_n not in centro_encuestas:
+            centro_encuestas[centro_n] = {}
+        centro_encuestas[centro_n][periodo_n] = n
+    process_cobertura_ep(token, centro_encuestas)
 
 if __name__ == '__main__':
     main()
