@@ -622,7 +622,11 @@ def get_all_altas_from_sheet(sheet_id, hoja, token):
             break
 
     if header_idx is None:
+        print(f"     ⚠ No se encontró header válido en {sheet_id}/{hoja}")
         return []
+
+    print(f"     Header en fila {header_idx}: enc={col_enc}, alta={col_alta}, calif={col_calif}")
+    print(f"     Primeras cols: {header[:8]}")
 
     col_enc  = next((i for i, h in enumerate(header) if 'encuesta' in h and 'tipo' not in h and 'envio' not in h), None)
     col_alta = next((i for i, h in enumerate(header) if 'fecha alta' in h or h == 'alta'), None)
@@ -633,14 +637,25 @@ def get_all_altas_from_sheet(sheet_id, hoja, token):
 
     resultados = []
     for row in rows[header_idx + 1:]:
-        if not row or not any(str(c).strip() for c in row[:4]):
+        if not row:
             continue
         primera = str(row[0]).strip().lower()
-        # Parar si encontramos otro bloque de header (sección de internados, resumen, etc.)
-        if primera in ('nombre del paciente', 'f', 'rango fechas', 'totales', 'semana actual'):
+
+        # Parar si encontramos la fila de resumen ("Totales", "Semana Actual", etc.)
+        if primera in ('totales', 'semana actual'):
             break
-        # Ignorar filas de resumen semanal (primera columna vacía pero tiene "rango fechas" en col 1)
-        if len(row) > 1 and 'rango' in str(row[1]).lower():
+        # Parar si la fila parece un segundo bloque de header
+        # (tiene "nombre del paciente" en col 0 pero NO tiene Fecha Alta en la posición esperada)
+        if primera == 'nombre del paciente':
+            # Verificar si este header tiene calificación — si no, es otro bloque, parar
+            row_lower = [str(c).strip().lower() for c in row]
+            if not any('calificaci' in c for c in row_lower):
+                break
+        # Ignorar filas completamente vacías
+        if not any(str(c).strip() for c in row[:4]):
+            continue
+        # Ignorar si la primera celda empieza con texto que indica resumen
+        if any(primera.startswith(x) for x in ('rango', 'semana', 'total', 'scsj')):
             break
 
         # Excluir Duplicados
