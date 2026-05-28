@@ -943,6 +943,7 @@ def main():
     print("\n4. Leyendo Google Ratings desde hoja manual...")
     ratings_history = read_ratings_history()
 
+
     HEADER = [
         "centro","periodo","financiador",
         "nps","n_nps","pct_promotores","pct_detractores",
@@ -964,6 +965,7 @@ def main():
     for centro in centros:
         print(f"   → {centro}")
         crows = [r for r in all_rows if safe(r,C_CENTRO).strip()==centro]
+
         sparkline = calc_sparkline(crows)
 
         # Google rating actual e historial
